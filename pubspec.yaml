@@ -30,10 +30,12 @@ dependencies:
 
   # Networking
   socket_io_client: ^3.0.2
+  dio: ^5.7.0
 
   # Utilities
   intl: ^0.19.0
   fluttertoast: ^8.2.8
+  flutter_secure_storage: ^10.3.1
 
 dev_dependencies:
   flutter_test:

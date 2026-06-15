@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 
-class GradientButton extends StatefulWidget {
+/// Whether a given [GradientButton] is currently pressed. Keyed per button
+/// instance (by a unique token from its state) so each button animates
+/// independently, and auto-disposes when the button leaves the tree.
+final _buttonPressedProvider =
+    AutoDisposeStateProvider.family<bool, Object>((ref, _) => false);
+
+class GradientButton extends ConsumerStatefulWidget {
   const GradientButton({
     super.key,
     required this.label,
@@ -26,23 +33,32 @@ class GradientButton extends StatefulWidget {
   final double borderRadius;
 
   @override
-  State<GradientButton> createState() => _GradientButtonState();
+  ConsumerState<GradientButton> createState() => _GradientButtonState();
 }
 
-class _GradientButtonState extends State<GradientButton> {
-  bool _pressed = false;
+class _GradientButtonState extends ConsumerState<GradientButton> {
+  // Unique identity for this button's entry in [_buttonPressedProvider].
+  final Object _token = Object();
 
   @override
   Widget build(BuildContext context) {
+    // While loading we swallow taps so the action can't be fired twice.
+    final disabled = widget.isLoading || widget.onTap == null;
+    final pressed = ref.watch(_buttonPressedProvider(_token));
+    void setPressed(bool value) =>
+        ref.read(_buttonPressedProvider(_token).notifier).state = value;
+
     return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap?.call();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
+      onTapDown: disabled ? null : (_) => setPressed(true),
+      onTapUp: disabled
+          ? null
+          : (_) {
+              setPressed(false);
+              widget.onTap?.call();
+            },
+      onTapCancel: disabled ? null : () => setPressed(false),
       child: AnimatedScale(
-        scale: _pressed ? 0.96 : 1.0,
+        scale: pressed ? 0.96 : 1.0,
         duration: const Duration(milliseconds: 100),
         child: Container(
           width: widget.width,

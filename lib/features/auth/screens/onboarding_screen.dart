@@ -47,13 +47,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         curve: Curves.easeOutCubic,
       );
     } else {
-      ref.read(authProvider.notifier).completeOnboarding();
-      context.go(AppConstants.routeAuth);
+      _finishOnboarding();
     }
   }
 
-  void _skip() {
-    ref.read(authProvider.notifier).completeOnboarding();
+  void _skip() => _finishOnboarding();
+
+  /// Persists onboarding completion to secure storage, then routes to login.
+  Future<void> _finishOnboarding() async {
+    await ref.read(authProvider.notifier).completeOnboarding();
+    if (!mounted) return;
     context.go(AppConstants.routeAuth);
   }
 

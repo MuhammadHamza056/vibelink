@@ -32,7 +32,7 @@ class VibeStatCard extends StatelessWidget {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
@@ -42,15 +42,27 @@ class VibeStatCard extends StatelessWidget {
                 ),
                 child: Icon(icon, color: Colors.white, size: 18),
               ),
-              const SizedBox(height: 12),
-              Text(
-                value,
-                style: AppTextStyles.headlineMedium.copyWith(
-                  fontWeight: FontWeight.w800,
+              // Scale the value down rather than overflow the fixed grid cell,
+              // which keeps the card intact under larger text scales too.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: AppTextStyles.headlineMedium.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 2),
-              Text(label, style: AppTextStyles.bodySmall),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.bodySmall,
+              ),
             ],
           ),
         ),

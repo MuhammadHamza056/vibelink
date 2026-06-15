@@ -42,6 +42,46 @@ class ChallengeModel {
   final bool isTrending;
   final bool isDaily;
 
+  /// Builds a challenge from the GET /api/challenges payload. The backend has
+  /// no participant counts, status or expiry, so those default; `vibeTags`
+  /// becomes [tags] and `isTrending` is derived from the XP reward so the
+  /// Trending filter stays meaningful.
+  factory ChallengeModel.fromJson(Map<String, dynamic> json) {
+    final xpReward = (json['xpReward'] ?? 0) as int;
+    return ChallengeModel(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      title: (json['title'] ?? '') as String,
+      description: (json['description'] ?? '') as String,
+      emoji: (json['emoji'] ?? '🎯') as String,
+      durationMinutes: (json['durationMinutes'] ?? 0) as int,
+      category: _categoryFrom(json['category'] as String?),
+      difficulty: _difficultyFrom(json['difficulty'] as String?),
+      status: ChallengeStatus.available,
+      participants: 0,
+      maxParticipants: 0,
+      xpReward: xpReward,
+      tags: (json['vibeTags'] as List?)?.cast<String>() ?? const [],
+      expiresAt: DateTime.tryParse('${json['updatedAt']}')
+              ?.add(const Duration(days: 1)) ??
+          DateTime.now().add(const Duration(days: 1)),
+      isTrending: xpReward >= 120,
+    );
+  }
+
+  static ChallengeCategory _categoryFrom(String? s) {
+    for (final c in ChallengeCategory.values) {
+      if (c.name == s) return c;
+    }
+    return ChallengeCategory.social;
+  }
+
+  static ChallengeDifficulty _difficultyFrom(String? s) {
+    for (final d in ChallengeDifficulty.values) {
+      if (d.name == s) return d;
+    }
+    return ChallengeDifficulty.easy;
+  }
+
   String get difficultyLabel => switch (difficulty) {
         ChallengeDifficulty.easy => 'Easy',
         ChallengeDifficulty.medium => 'Medium',

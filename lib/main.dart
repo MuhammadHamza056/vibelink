@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
+import 'core/storage/token_storage.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
@@ -13,5 +14,23 @@ void main() {
       systemNavigationBarColor: Colors.transparent,
     ),
   );
-  runApp(const ProviderScope(child: VibeLinkApp()));
+
+  // Load any persisted session before the app builds so the router can gate
+  // the first frame straight to login, onboarding or home.
+  final tokenStorage = TokenStorage();
+  final accessToken = await tokenStorage.readAccessToken();
+  final refreshToken = await tokenStorage.readRefreshToken();
+  final seenOnboarding = await tokenStorage.readOnboardingSeen();
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        bootstrapTokensProvider.overrideWithValue(
+          (accessToken: accessToken, refreshToken: refreshToken),
+        ),
+        bootstrapOnboardingSeenProvider.overrideWithValue(seenOnboarding),
+      ],
+      child: const VibeLinkApp(),
+    ),
+  );
 }

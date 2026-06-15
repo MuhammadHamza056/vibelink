@@ -13,6 +13,13 @@ class UserModel {
     required this.memoriesCount,
     required this.isOnBurnoutGuard,
     required this.lastActiveDate,
+    this.email = '',
+    this.provider = '',
+    this.safetyPulseEnabled = false,
+    this.hasSeenOnboarding = false,
+    this.activeChallengeIds = const [],
+    this.createdAt,
+    this.updatedAt,
   });
 
   final String id;
@@ -28,6 +35,47 @@ class UserModel {
   final int memoriesCount;
   final bool isOnBurnoutGuard;
   final DateTime lastActiveDate;
+
+  /// Fields surfaced by GET /api/profile.
+  final String email;
+  final String provider;
+  final bool safetyPulseEnabled;
+  final bool hasSeenOnboarding;
+  final List<String> activeChallengeIds;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    final badges = (json['badges'] as List?)
+            ?.whereType<Map<String, dynamic>>()
+            .map(BadgeModel.fromJson)
+            .toList() ??
+        const <BadgeModel>[];
+    return UserModel(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      username: (json['username'] ?? '') as String,
+      avatarUrl: (json['avatarUrl'] ?? '') as String,
+      level: (json['level'] ?? 1) as int,
+      xp: (json['xp'] ?? 0) as int,
+      streakDays: (json['streakDays'] ?? 0) as int,
+      vibeTags: (json['vibeTags'] as List?)?.cast<String>() ?? const [],
+      badges: badges,
+      challengesCompleted: (json['challengesCompleted'] ?? 0) as int,
+      matchesCount: (json['matchesCount'] ?? 0) as int,
+      memoriesCount: (json['memoriesCount'] ?? 0) as int,
+      isOnBurnoutGuard: (json['isOnBurnoutGuard'] ?? false) as bool,
+      lastActiveDate: DateTime.tryParse('${json['lastActiveDate']}') ??
+          DateTime.now(),
+      email: (json['email'] ?? '') as String,
+      provider: (json['provider'] ?? '') as String,
+      safetyPulseEnabled: (json['safetyPulseEnabled'] ?? false) as bool,
+      hasSeenOnboarding: (json['hasSeenOnboarding'] ?? false) as bool,
+      activeChallengeIds:
+          (json['activeChallengeIds'] as List?)?.cast<String>() ?? const [],
+      createdAt: DateTime.tryParse('${json['createdAt']}'),
+      updatedAt: DateTime.tryParse('${json['updatedAt']}'),
+    );
+  }
 
   int get xpToNextLevel => 1000 - (xp % 1000);
   double get levelProgress => (xp % 1000) / 1000;
@@ -54,6 +102,13 @@ class UserModel {
     int? memoriesCount,
     bool? isOnBurnoutGuard,
     DateTime? lastActiveDate,
+    String? email,
+    String? provider,
+    bool? safetyPulseEnabled,
+    bool? hasSeenOnboarding,
+    List<String>? activeChallengeIds,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -69,6 +124,13 @@ class UserModel {
       memoriesCount: memoriesCount ?? this.memoriesCount,
       isOnBurnoutGuard: isOnBurnoutGuard ?? this.isOnBurnoutGuard,
       lastActiveDate: lastActiveDate ?? this.lastActiveDate,
+      email: email ?? this.email,
+      provider: provider ?? this.provider,
+      safetyPulseEnabled: safetyPulseEnabled ?? this.safetyPulseEnabled,
+      hasSeenOnboarding: hasSeenOnboarding ?? this.hasSeenOnboarding,
+      activeChallengeIds: activeChallengeIds ?? this.activeChallengeIds,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -103,6 +165,16 @@ class BadgeModel {
   final String emoji;
   final String description;
   final DateTime earnedAt;
+
+  factory BadgeModel.fromJson(Map<String, dynamic> json) {
+    return BadgeModel(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      name: (json['name'] ?? '') as String,
+      emoji: (json['emoji'] ?? '') as String,
+      description: (json['description'] ?? '') as String,
+      earnedAt: DateTime.tryParse('${json['earnedAt']}') ?? DateTime.now(),
+    );
+  }
 
   static List<BadgeModel> get mockList => [
         BadgeModel(

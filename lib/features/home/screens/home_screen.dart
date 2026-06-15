@@ -7,6 +7,9 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/app_helpers.dart';
+import '../../../models/challenge_model.dart';
+import '../../../models/home_model.dart';
+import '../../../models/user_model.dart';
 import '../../../shared/widgets/challenge_card.dart';
 import '../../../shared/widgets/safety_pulse_button.dart';
 import '../../../shared/widgets/streak_indicator.dart';
@@ -19,6 +22,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(homeProvider);
+    final home = state.home;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -58,7 +62,7 @@ class HomeScreen extends ConsumerWidget {
               onRefresh: () => ref.read(homeProvider.notifier).refresh(),
               child: CustomScrollView(
                 slivers: [
-                  _AppBar(user: state.user),
+                  _AppBar(profile: state.profile),
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                     sliver: SliverList(
@@ -75,15 +79,15 @@ class HomeScreen extends ConsumerWidget {
                                     style: AppTextStyles.bodyMedium,
                                   ),
                                   Text(
-                                    state.user?.username ?? '',
+                                    home?.username ?? '',
                                     style: AppTextStyles.headlineLarge,
                                   ),
                                 ],
                               ),
                             ),
-                            if (state.user != null)
+                            if (home != null)
                               StreakIndicator(
-                                streakDays: state.user!.streakDays,
+                                streakDays: home.streakDays,
                                 compact: true,
                               ),
                           ],
@@ -93,37 +97,35 @@ class HomeScreen extends ConsumerWidget {
                         // Safety Pulse
                         SafetyPulseBanner(
                           isActive: state.safetyPulseActive,
-                          onToggle: () =>
-                              ref.read(homeProvider.notifier).toggleSafetyPulse(),
+                          onToggle: () => ref
+                              .read(homeProvider.notifier)
+                              .toggleSafetyPulse(),
                         ),
                         const SizedBox(height: 24),
 
                         // Daily Challenge
-                        Text(
-                          '⭐ Challenge of the Day',
-                          style: AppTextStyles.titleLarge,
-                        ).animate(delay: 100.ms).fadeIn(),
-                        const SizedBox(height: 12),
-                        if (state.dailyChallenge != null)
+                        if (home?.dailyChallenge != null) ...[
+                          Text(
+                            '⭐ Challenge of the Day',
+                            style: AppTextStyles.titleLarge,
+                          ).animate(delay: 100.ms).fadeIn(),
+                          const SizedBox(height: 12),
                           ChallengeCard(
-                            challenge: state.dailyChallenge!,
+                            challenge: home!.dailyChallenge!,
                             isLarge: true,
                             onTap: () => context.push(
-                              '/challenge/${state.dailyChallenge!.id}',
+                              '/challenge/${home.dailyChallenge!.id}',
                             ),
-                          ).animate(delay: 150.ms).fadeIn(duration: 500.ms).slideY(begin: 0.1, end: 0),
-                        const SizedBox(height: 28),
+                          )
+                              .animate(delay: 150.ms)
+                              .fadeIn(duration: 500.ms)
+                              .slideY(begin: 0.1, end: 0),
+                          const SizedBox(height: 28),
+                        ],
 
-                        // Nearby vibers
-                        Text(
-                          'Nearby Vibers',
-                          style: AppTextStyles.titleLarge,
-                        ).animate(delay: 200.ms).fadeIn(),
-                        const SizedBox(height: 12),
-                        NearbyVibersRow(count: state.nearbyCount)
-                            .animate(delay: 250.ms)
-                            .fadeIn(duration: 500.ms),
-                        const SizedBox(height: 28),
+                        // Suggested challenges
+                        if (home != null && home.suggestedChallenges.length > 1)
+                          _SuggestedChallenges(challenges: home.suggestedChallenges),
 
                         // Quick stats
                         Text(
@@ -131,20 +133,18 @@ class HomeScreen extends ConsumerWidget {
                           style: AppTextStyles.titleLarge,
                         ).animate(delay: 300.ms).fadeIn(),
                         const SizedBox(height: 12),
-                        if (state.user != null)
-                          _StatsGrid(user: state.user!),
+                        if (home != null) _StatsGrid(home: home),
 
                         const SizedBox(height: 28),
 
                         // XP Progress
-                        if (state.user != null)
+                        if (home != null)
                           XPProgressBar(
-                            level: state.user!.level,
-                            progress: state.user!.levelProgress,
-                            currentXP: state.user!.xp % 1000,
-                            xpToNext: state.user!.xpToNextLevel,
+                            level: home.level,
+                            progress: home.progress,
+                            currentXP: home.currentLevelXp,
+                            xpToNext: home.xpToNextLevel,
                           ).animate(delay: 400.ms).fadeIn(duration: 500.ms),
-
                         const SizedBox(height: 100),
                       ]),
                     ),
@@ -159,8 +159,8 @@ class HomeScreen extends ConsumerWidget {
 }
 
 class _AppBar extends StatelessWidget {
-  const _AppBar({this.user});
-  final dynamic user;
+  const _AppBar({this.profile});
+  final UserModel? profile;
 
   @override
   Widget build(BuildContext context) {
@@ -169,51 +169,54 @@ class _AppBar extends StatelessWidget {
       floating: true,
       expandedHeight: 0,
       toolbarHeight: 64,
-      flexibleSpace: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(8),
+      flexibleSpace: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.bolt_rounded,
+                        color: Colors.white, size: 18),
                   ),
-                  child: const Icon(Icons.bolt_rounded,
-                      color: Colors.white, size: 18),
-                ),
-                const SizedBox(width: 8),
-                ShaderMask(
-                  shaderCallback: (b) =>
-                      AppColors.primaryGradient.createShader(b),
-                  child: Text(
-                    AppConstants.appName,
-                    style: AppTextStyles.headlineSmall.copyWith(
-                      color: Colors.white,
+                  const SizedBox(width: 8),
+                  ShaderMask(
+                    shaderCallback: (b) =>
+                        AppColors.primaryGradient.createShader(b),
+                    child: Text(
+                      AppConstants.appName,
+                      style: AppTextStyles.headlineSmall.copyWith(
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_rounded,
-                      color: AppColors.textSecondary),
-                  onPressed: () {},
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings_rounded,
-                      color: AppColors.textSecondary),
-                  onPressed: () {},
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_rounded,
+                        color: AppColors.textSecondary),
+                    onPressed: () {},
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.settings_rounded,
+                        color: AppColors.textSecondary),
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -221,8 +224,8 @@ class _AppBar extends StatelessWidget {
 }
 
 class _StatsGrid extends StatelessWidget {
-  const _StatsGrid({required this.user});
-  final dynamic user;
+  const _StatsGrid({required this.home});
+  final HomeModel home;
 
   @override
   Widget build(BuildContext context) {
@@ -236,19 +239,19 @@ class _StatsGrid extends StatelessWidget {
       children: [
         VibeStatCard(
           label: 'Challenges',
-          value: '${user.challengesCompleted}',
+          value: '${home.challengesCompleted}',
           icon: Icons.bolt_rounded,
           gradient: AppColors.primaryGradient,
         ),
         VibeStatCard(
           label: 'Matches',
-          value: '${user.matchesCount}',
+          value: '${home.matchesCount}',
           icon: Icons.people_rounded,
           gradient: AppColors.cyanPurpleGradient,
         ),
         VibeStatCard(
           label: 'Memories',
-          value: '${user.memoriesCount}',
+          value: '${home.memoriesCount}',
           icon: Icons.bubble_chart_rounded,
           gradient: AppColors.goldGradient,
         ),
@@ -256,6 +259,46 @@ class _StatsGrid extends StatelessWidget {
     ).animate(delay: 350.ms).fadeIn(duration: 500.ms);
   }
 }
+
+class _SuggestedChallenges extends StatelessWidget {
+  const _SuggestedChallenges({required this.challenges});
+  final List<ChallengeModel> challenges;
+
+  @override
+  Widget build(BuildContext context) {
+    // Skip the first one — it's already featured as the Challenge of the Day.
+    final items = challenges.skip(1).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Suggested for You',
+          style: AppTextStyles.titleLarge,
+        ).animate(delay: 200.ms).fadeIn(),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 190,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, i) => SizedBox(
+              width: 150,
+              child: ChallengeCard(
+                challenge: items[i],
+                index: i,
+                onTap: () => context.push('/challenge/${items[i].id}'),
+              ),
+            ),
+          ),
+        ).animate(delay: 250.ms).fadeIn(duration: 500.ms),
+        const SizedBox(height: 28),
+      ],
+    );
+  }
+}
+
+
 
 class _HomeShimmer extends StatelessWidget {
   @override
@@ -286,7 +329,8 @@ class _HomeShimmer extends StatelessWidget {
 }
 
 class _ShimmerBox extends StatelessWidget {
-  const _ShimmerBox({required this.width, required this.height, required this.radius});
+  const _ShimmerBox(
+      {required this.width, required this.height, required this.radius});
   final double width;
   final double height;
   final double radius;

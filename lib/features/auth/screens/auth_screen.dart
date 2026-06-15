@@ -19,26 +19,57 @@ class AuthScreen extends ConsumerStatefulWidget {
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _emailCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  bool _isSignUp = false;
-  bool _obscurePass = true;
 
   @override
   void dispose() {
     _emailCtrl.dispose();
+    _usernameCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _onEmailAuth() async {
-    if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
+    final isSignUp = ref.read(authFormProvider).isSignUp;
+    final needsUsername = isSignUp && _usernameCtrl.text.trim().isEmpty;
+    if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty || needsUsername) {
       ToastUtil.warning(context, 'Please fill in all fields');
       return;
     }
-    await ref
+
+    if (isSignUp) {
+      final ok = await ref.read(authProvider.notifier).register(
+            email: _emailCtrl.text.trim(),
+            username: _usernameCtrl.text.trim(),
+            password: _passCtrl.text,
+          );
+      if (!mounted) return;
+      final auth = ref.read(authProvider);
+      if (ok) {
+        ToastUtil.success(
+          context,
+          auth.message ?? 'Account created successfully',
+        );
+        // Move to the login view so the new user can sign in.
+        ref.read(authFormProvider.notifier).showLogin();
+        _usernameCtrl.clear();
+        _passCtrl.clear();
+      } else {
+        ToastUtil.error(context, auth.error ?? 'Registration failed');
+      }
+      return;
+    }
+
+    final ok = await ref
         .read(authProvider.notifier)
-        .signInWithEmail(_emailCtrl.text, _passCtrl.text);
-    if (mounted) context.go(AppConstants.routeHome);
+        .signInWithEmail(_emailCtrl.text.trim(), _passCtrl.text);
+    if (!mounted) return;
+    if (ok) {
+      context.go(AppConstants.routeHome);
+    } else {
+      ToastUtil.error(context, ref.read(authProvider).error ?? 'Login failed');
+    }
   }
 
   Future<void> _onGoogle() async {
@@ -54,6 +85,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
+    final form = ref.watch(authFormProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -118,12 +150,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   ).animate().fadeIn(duration: 400.ms),
                   const SizedBox(height: 40),
                   Text(
-                    _isSignUp ? 'Create your\naccount ✨' : 'Welcome\nback 👋',
+                    form.isSignUp
+                        ? 'Create your\naccount ✨'
+                        : 'Welcome\nback 👋',
                     style: AppTextStyles.displayMedium,
                   ).animate(delay: 100.ms).fadeIn(duration: 500.ms).slideY(begin: 0.2, end: 0),
                   const SizedBox(height: 8),
                   Text(
-                    _isSignUp
+                    form.isSignUp
                         ? 'Join the real-world social revolution'
                         : 'Your vibe squad is waiting for you',
                     style: AppTextStyles.bodyMedium,
@@ -165,27 +199,37 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     keyboardType: TextInputType.emailAddress,
                   ).animate(delay: 400.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
                   const SizedBox(height: 12),
+                  // Username field (sign up only)
+                  if (form.isSignUp) ...[
+                    _GlassTextField(
+                      controller: _usernameCtrl,
+                      hint: 'Username',
+                      icon: Icons.person_rounded,
+                      keyboardType: TextInputType.name,
+                    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0),
+                    const SizedBox(height: 12),
+                  ],
                   // Password field
                   _GlassTextField(
                     controller: _passCtrl,
                     hint: 'Password',
                     icon: Icons.lock_rounded,
-                    obscure: _obscurePass,
+                    obscure: form.obscurePassword,
                     suffix: IconButton(
                       icon: Icon(
-                        _obscurePass
+                        form.obscurePassword
                             ? Icons.visibility_rounded
                             : Icons.visibility_off_rounded,
                         color: AppColors.textSecondary,
                         size: 20,
                       ),
                       onPressed: () =>
-                          setState(() => _obscurePass = !_obscurePass),
+                          ref.read(authFormProvider.notifier).toggleObscure(),
                     ),
                   ).animate(delay: 450.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
                   const SizedBox(height: 28),
                   GradientButton(
-                    label: _isSignUp ? 'Create Account' : 'Sign In',
+                    label: form.isSignUp ? 'Create Account' : 'Sign In',
                     onTap: _onEmailAuth,
                     isLoading: auth.isLoading,
                     width: double.infinity,
@@ -193,18 +237,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   const SizedBox(height: 24),
                   Center(
                     child: GestureDetector(
-                      onTap: () => setState(() => _isSignUp = !_isSignUp),
+                      onTap: () =>
+                          ref.read(authFormProvider.notifier).toggleMode(),
                       child: RichText(
                         text: TextSpan(
                           children: [
                             TextSpan(
-                              text: _isSignUp
+                              text: form.isSignUp
                                   ? 'Already have an account? '
                                   : 'Don\'t have an account? ',
                               style: AppTextStyles.bodyMedium,
                             ),
                             TextSpan(
-                              text: _isSignUp ? 'Sign In' : 'Sign Up',
+                              text: form.isSignUp ? 'Sign In' : 'Sign Up',
                               style: AppTextStyles.bodyMedium.copyWith(
                                 color: AppColors.primaryLight,
                                 fontWeight: FontWeight.w700,

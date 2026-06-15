@@ -89,7 +89,10 @@ class _NavButton extends StatelessWidget {
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutBack,
+              // easeOutBack overshoots past the end value, which drives the
+              // tweened boxShadow blurRadius negative and trips an assertion.
+              // easeOut gives the same feel without the overshoot.
+              curve: Curves.easeOut,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
                 gradient: isSelected ? AppColors.primaryGradient : null,

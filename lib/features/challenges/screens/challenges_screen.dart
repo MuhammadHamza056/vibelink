@@ -78,6 +78,36 @@ class ChallengesScreen extends ConsumerWidget {
                   child: CircularProgressIndicator(color: AppColors.primaryLight),
                 ),
               )
+            else if (state.error != null && state.challenges.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('😕', style: TextStyle(fontSize: 48)),
+                        const SizedBox(height: 16),
+                        Text(
+                          state.error!,
+                          style: AppTextStyles.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 20),
+                        TextButton(
+                          onPressed: () =>
+                              ref.read(challengeProvider.notifier).refresh(),
+                          child: Text(
+                            'Retry',
+                            style: AppTextStyles.titleMedium
+                                .copyWith(color: AppColors.primaryLight),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
             else if (state.filtered.isEmpty)
               SliverFillRemaining(
                 child: Center(

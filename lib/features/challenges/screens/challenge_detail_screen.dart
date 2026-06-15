@@ -16,6 +16,15 @@ class ChallengeDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final challenge = ref.watch(challengeByIdProvider(id));
+    final isStarted = ref.watch(
+      challengeProvider.select((s) => s.isStarted(id)),
+    );
+    final isStarting = ref.watch(
+      challengeProvider.select((s) => s.startingId == id),
+    );
+    final isCompleting = ref.watch(
+      challengeProvider.select((s) => s.completingId == id),
+    );
 
     if (challenge == null) {
       return Scaffold(
@@ -182,17 +191,51 @@ class ChallengeDetailScreen extends ConsumerWidget {
 
                 // CTA
                 GradientButton(
-                  label: 'Start Challenge 🚀',
+                  label: isStarted
+                      ? 'Complete Challenge ✅'
+                      : 'Start Challenge 🚀',
                   gradient: challenge.gradient,
-                  onTap: () {
-                    ref
-                        .read(challengeProvider.notifier)
-                        .startChallenge(challenge);
-                    ToastUtil.success(
-                      context,
-                      '${challenge.emoji} Challenge started! Good luck!',
-                    );
-                    Navigator.of(context).pop();
+                  isLoading: isStarting || isCompleting,
+                  onTap: () async {
+                    final notifier = ref.read(challengeProvider.notifier);
+
+                    // Already started → complete it via the API, then leave.
+                    if (isStarted) {
+                      final done =
+                          await notifier.completeChallenge(challenge.id);
+                      if (!context.mounted) return;
+                      if (done) {
+                        ToastUtil.success(
+                          context,
+                          '${challenge.emoji} Challenge completed! 🎉',
+                        );
+                        Navigator.of(context).pop();
+                      } else {
+                        ToastUtil.error(
+                          context,
+                          ref.read(challengeProvider).error ??
+                              'Could not complete the challenge.',
+                        );
+                      }
+                      return;
+                    }
+
+                    // Otherwise kick off the start request; the button flips to
+                    // "Complete Challenge" on success.
+                    final ok = await notifier.startChallenge(challenge.id);
+                    if (!context.mounted) return;
+                    if (ok) {
+                      ToastUtil.success(
+                        context,
+                        '${challenge.emoji} Challenge started! Good luck!',
+                      );
+                    } else {
+                      ToastUtil.error(
+                        context,
+                        ref.read(challengeProvider).error ??
+                            'Could not start the challenge.',
+                      );
+                    }
                   },
                   width: double.infinity,
                   height: 58,
@@ -231,8 +274,8 @@ class _InfoRow extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         _InfoChip(
-          icon: Icons.people_rounded,
-          label: '${challenge.participants} joined',
+          icon: Icons.category_rounded,
+          label: challenge.categoryLabel,
           color: AppColors.green,
         ),
         const SizedBox(width: 10),

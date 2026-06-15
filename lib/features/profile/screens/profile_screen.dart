@@ -19,11 +19,39 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(profileProvider);
 
-    if (state.isLoading || state.user == null) {
+    if (state.isLoading && state.user == null) {
       return const Scaffold(
         backgroundColor: AppColors.background,
         body: Center(
           child: CircularProgressIndicator(color: AppColors.primaryLight),
+        ),
+      );
+    }
+
+    if (state.user == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('😕', style: TextStyle(fontSize: 40)),
+                const SizedBox(height: 12),
+                Text(
+                  state.error ?? 'Could not load your profile.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodyMedium,
+                ),
+                const SizedBox(height: 20),
+                GradientButton(
+                  label: 'Retry',
+                  onTap: () => ref.read(profileProvider.notifier).refresh(),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }
@@ -104,7 +132,10 @@ class ProfileScreen extends ConsumerWidget {
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) => Center(
                                     child: Text(
-                                      user.username[0].toUpperCase(),
+                                      (user.username.isEmpty
+                                              ? '?'
+                                              : user.username[0])
+                                          .toUpperCase(),
                                       style: AppTextStyles.displayMedium
                                           .copyWith(color: AppColors.primaryLight),
                                     ),
@@ -151,6 +182,13 @@ class ProfileScreen extends ConsumerWidget {
                             color: AppColors.primaryLight,
                           ),
                         ).animate(delay: 250.ms).fadeIn(),
+                        if (user.email.isNotEmpty)
+                          Text(
+                            user.email,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ).animate(delay: 280.ms).fadeIn(),
                       ],
                     ),
                   ),
@@ -232,8 +270,11 @@ class ProfileScreen extends ConsumerWidget {
                 // Sign out
                 OutlineButton(
                   label: 'Sign Out',
-                  onTap: () {
-                    ref.read(authProvider.notifier).signOut();
+                  onTap: () async {
+                    // Wipe the access/refresh tokens from secure storage and
+                    // clear the auth header before routing back to login.
+                    await ref.read(authProvider.notifier).signOut();
+                    if (!context.mounted) return;
                     context.go(AppConstants.routeAuth);
                   },
                   color: AppColors.error,

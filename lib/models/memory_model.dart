@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/constants/app_colors.dart';
+import '../core/constants/app_constants.dart';
 
 class MemoryModel {
   const MemoryModel({
@@ -11,6 +12,7 @@ class MemoryModel {
     required this.createdAt,
     required this.gradientIndex,
     this.imageUrl,
+    this.vibeTags = const [],
   });
 
   final String id;
@@ -21,6 +23,29 @@ class MemoryModel {
   final DateTime createdAt;
   final int gradientIndex;
   final String? imageUrl;
+  final List<String> vibeTags;
+
+  /// Builds a memory from the GET /api/memories payload. The backend has no
+  /// emoji or colour, so we derive both deterministically from the id (stable
+  /// per memory, varied across the grid). It also has no partner, so the
+  /// partner chip is hidden via the 'solo' sentinel.
+  factory MemoryModel.fromJson(Map<String, dynamic> json) {
+    final id = (json['id'] ?? json['_id'] ?? '').toString();
+    final seed = id.hashCode.abs();
+    final emojis = AppConstants.challengeEmojis;
+    final img = (json['imageUrl'] ?? '') as String;
+    return MemoryModel(
+      id: id,
+      challengeTitle: (json['title'] ?? '') as String,
+      challengeEmoji: emojis[seed % emojis.length],
+      note: (json['caption'] ?? '') as String,
+      partnerUsername: 'solo',
+      createdAt: DateTime.tryParse('${json['createdAt']}') ?? DateTime.now(),
+      gradientIndex: seed % _gradients.length,
+      imageUrl: img.isEmpty ? null : img,
+      vibeTags: (json['vibeTags'] as List?)?.cast<String>() ?? const [],
+    );
+  }
 
   LinearGradient get gradient => _gradients[gradientIndex % _gradients.length];
 
