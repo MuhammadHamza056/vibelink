@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/services/location_service.dart';
 import '../../../models/home_model.dart';
 import '../../../models/user_model.dart';
 
@@ -51,6 +52,11 @@ class HomeNotifier extends Notifier<HomeState> {
   /// handled independently so a profile failure never blanks the dashboard.
   Future<void> _load() async {
     final client = ref.read(apiClientProvider);
+
+    // Best-effort: push the device location to the backend. Fire-and-forget so
+    // it never blocks or breaks the dashboard load.
+    _syncLocation(client);
+
     final results = await Future.wait([
       _fetchHome(client),
       _fetchProfile(client),
@@ -68,11 +74,34 @@ class HomeNotifier extends Notifier<HomeState> {
     );
   }
 
+  /// Reads the current device location and PUTs it to /api/profile/location.
+  /// Failures (permission denied, services off, offline) are swallowed since
+  /// location is non-critical to the home dashboard.
+  Future<void> _syncLocation(ApiClient client) async {
+    try {
+      final pos = await ref.read(locationServiceProvider).currentPosition();
+      if (pos == null) return;
+      await client.put(
+        ApiEndpoints.profileLocation,
+        body: {'lat': pos.latitude, 'lng': pos.longitude},
+      );
+    } catch (_) {
+      // Ignore — location sync is best-effort.
+    }
+  }
+
   Future<HomeModel?> _fetchHome(ApiClient client) async {
     try {
       final res = await client.get(ApiEndpoints.home);
       final body = res['body'];
-      return body is Map<String, dynamic> ? HomeModel.fromJson(body) : null;
+      if (body is! Map<String, dynamic>) return null;
+      final home = HomeModel.fromJson(body);
+      // Randomize which challenge is featured as the "Challenge of the Day".
+      // Shuffling once on load keeps it stable across rebuilds, while a
+      // pull-to-refresh picks a fresh one. dailyChallenge reads .first and the
+      // "Suggested for You" row skips that same first item, so they stay in sync.
+      home.suggestedChallenges.shuffle();
+      return home;
     } catch (_) {
       return null;
     }

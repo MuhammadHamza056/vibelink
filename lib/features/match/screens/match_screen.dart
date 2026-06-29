@@ -222,12 +222,18 @@ class _StatusSection extends StatelessWidget {
     return switch (state.status) {
       MatchStatus.searching => Column(
           children: [
-            Text('Scanning nearby vibes...',
-                style: AppTextStyles.headlineSmall),
+            Text(
+              state.error != null ? 'No match yet' : 'Scanning nearby vibes...',
+              style: AppTextStyles.headlineSmall,
+            ),
             const SizedBox(height: 8),
-            Text('Finding someone compatible with your energy',
-                style: AppTextStyles.bodyMedium,
-                textAlign: TextAlign.center),
+            Text(
+              state.error ?? 'Finding someone compatible with your energy',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: state.error != null ? AppColors.warning : null,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ).animate().fadeIn(duration: 400.ms),
       MatchStatus.found => Column(
@@ -244,10 +250,12 @@ class _StatusSection extends StatelessWidget {
               style: AppTextStyles.headlineMedium,
             ),
             const SizedBox(height: 4),
-            Text(
-              state.candidate?.distanceLabel ?? '',
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.cyan),
-            ),
+            if (state.candidate != null)
+              Text(
+                'Level ${state.candidate!.level}'
+                '${state.candidate!.sharedTags.isNotEmpty ? ' · ${state.candidate!.sharedTags.length} shared vibes' : ''}',
+                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.cyan),
+              ),
             const SizedBox(height: 16),
             // Vibe score bar
             if (state.candidate != null) ...[
@@ -283,8 +291,12 @@ class _StatusSection extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 alignment: WrapAlignment.center,
+                // Shared tags are highlighted (selected); the rest are muted.
                 children: state.candidate!.vibeTags
-                    .map((t) => VibeTagChip(label: t, isSelected: true))
+                    .map((t) => VibeTagChip(
+                          label: t,
+                          isSelected: state.candidate!.sharedTags.contains(t),
+                        ))
                     .toList(),
               ),
             ],
@@ -357,10 +369,23 @@ class _ActionButtons extends StatelessWidget {
               child: GradientButton(
                 label: 'Connect ✨',
                 gradient: AppColors.greenCyanGradient,
-                onTap: () {
-                  notifier.acceptMatch();
-                  ToastUtil.success(context, 'Vibe connection made! 🎉');
-                },
+                isLoading: state.isConnecting,
+                onTap: state.isConnecting
+                    ? null
+                    : () async {
+                        final ok = await notifier.acceptMatch();
+                        if (!context.mounted) return;
+                        if (ok) {
+                          ToastUtil.success(
+                              context, 'Vibe connection made! 🎉');
+                        } else {
+                          ToastUtil.error(
+                            context,
+                            ref.read(matchProvider).error ??
+                                'Could not connect.',
+                          );
+                        }
+                      },
               ),
             ),
           ],

@@ -1,10 +1,15 @@
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/network/api_endpoints.dart';
 import '../../../core/utils/app_helpers.dart';
 import '../../../core/utils/toast_util.dart';
+import '../../../models/challenge_model.dart';
 import '../../../shared/widgets/gradient_button.dart';
 import '../providers/challenge_provider.dart';
 
@@ -16,15 +21,6 @@ class ChallengeDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final challenge = ref.watch(challengeByIdProvider(id));
-    final isStarted = ref.watch(
-      challengeProvider.select((s) => s.isStarted(id)),
-    );
-    final isStarting = ref.watch(
-      challengeProvider.select((s) => s.startingId == id),
-    );
-    final isCompleting = ref.watch(
-      challengeProvider.select((s) => s.completingId == id),
-    );
 
     if (challenge == null) {
       return Scaffold(
@@ -67,8 +63,7 @@ class ChallengeDetailScreen extends ConsumerWidget {
                       child: Text(
                         challenge.emoji,
                         style: const TextStyle(fontSize: 160),
-                      ).animate(onPlay: (c) => c.repeat(reverse: true))
-                          .scale(
+                      ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(
                             duration: 3.seconds,
                             begin: const Offset(1, 1),
                             end: const Offset(1.08, 1.08),
@@ -83,8 +78,7 @@ class ChallengeDetailScreen extends ConsumerWidget {
                         children: [
                           Row(
                             children: [
-                              if (challenge.isDaily)
-                                _Tag(label: '⭐ Daily'),
+                              if (challenge.isDaily) _Tag(label: '⭐ Daily'),
                               if (challenge.isTrending)
                                 _Tag(label: '🔥 Trending'),
                             ],
@@ -110,13 +104,15 @@ class ChallengeDetailScreen extends ConsumerWidget {
               delegate: SliverChildListDelegate([
                 // Quick info row
                 _InfoRow(challenge: challenge)
-                    .animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
+                    .animate()
+                    .fadeIn(duration: 400.ms)
+                    .slideY(begin: 0.1, end: 0),
                 const SizedBox(height: 24),
 
                 // Description
-                Text('About this challenge',
-                    style: AppTextStyles.titleLarge)
-                    .animate(delay: 100.ms).fadeIn(),
+                Text('About this challenge', style: AppTextStyles.titleLarge)
+                    .animate(delay: 100.ms)
+                    .fadeIn(),
                 const SizedBox(height: 10),
                 Text(
                   challenge.description,
@@ -126,7 +122,8 @@ class ChallengeDetailScreen extends ConsumerWidget {
 
                 // Tags
                 Text('Tags', style: AppTextStyles.titleLarge)
-                    .animate(delay: 150.ms).fadeIn(),
+                    .animate(delay: 150.ms)
+                    .fadeIn(),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
@@ -150,6 +147,37 @@ class ChallengeDetailScreen extends ConsumerWidget {
                   }).toList(),
                 ).animate(delay: 180.ms).fadeIn(duration: 400.ms),
                 const SizedBox(height: 28),
+
+                // Shared with — only when this challenge is shared.
+                if (challenge.isShared && challenge.sharedWith.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      Text('Shared with', style: AppTextStyles.titleLarge),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.green.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '${challenge.sharedWith.length}',
+                          style: AppTextStyles.labelSmall
+                              .copyWith(color: AppColors.green),
+                        ),
+                      ),
+                    ],
+                  ).animate(delay: 190.ms).fadeIn(),
+                  const SizedBox(height: 12),
+                  ...challenge.sharedWith.map(
+                    (c) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _SharedConnectionRow(connection: c),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                ],
 
                 // Reward
                 Container(
@@ -186,60 +214,16 @@ class ChallengeDetailScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                ).animate(delay: 200.ms).fadeIn(duration: 500.ms).slideY(begin: 0.1, end: 0),
+                )
+                    .animate(delay: 200.ms)
+                    .fadeIn(duration: 500.ms)
+                    .slideY(begin: 0.1, end: 0),
                 const SizedBox(height: 32),
 
                 // CTA
-                GradientButton(
-                  label: isStarted
-                      ? 'Complete Challenge ✅'
-                      : 'Start Challenge 🚀',
-                  gradient: challenge.gradient,
-                  isLoading: isStarting || isCompleting,
-                  onTap: () async {
-                    final notifier = ref.read(challengeProvider.notifier);
-
-                    // Already started → complete it via the API, then leave.
-                    if (isStarted) {
-                      final done =
-                          await notifier.completeChallenge(challenge.id);
-                      if (!context.mounted) return;
-                      if (done) {
-                        ToastUtil.success(
-                          context,
-                          '${challenge.emoji} Challenge completed! 🎉',
-                        );
-                        Navigator.of(context).pop();
-                      } else {
-                        ToastUtil.error(
-                          context,
-                          ref.read(challengeProvider).error ??
-                              'Could not complete the challenge.',
-                        );
-                      }
-                      return;
-                    }
-
-                    // Otherwise kick off the start request; the button flips to
-                    // "Complete Challenge" on success.
-                    final ok = await notifier.startChallenge(challenge.id);
-                    if (!context.mounted) return;
-                    if (ok) {
-                      ToastUtil.success(
-                        context,
-                        '${challenge.emoji} Challenge started! Good luck!',
-                      );
-                    } else {
-                      ToastUtil.error(
-                        context,
-                        ref.read(challengeProvider).error ??
-                            'Could not start the challenge.',
-                      );
-                    }
-                  },
-                  width: double.infinity,
-                  height: 58,
-                ).animate(delay: 250.ms).fadeIn(duration: 500.ms),
+                _ChallengeCta(challenge: challenge)
+                    .animate(delay: 250.ms)
+                    .fadeIn(duration: 500.ms),
                 const SizedBox(height: 12),
                 OutlineButton(
                   label: 'Save for Later',
@@ -256,6 +240,103 @@ class ChallengeDetailScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+final _ctaTickerProvider = StreamProvider.autoDispose<int>(
+  (ref) => Stream<int>.periodic(const Duration(seconds: 1), (i) => i),
+);
+
+String _formatRemaining(Duration d) {
+  final m = d.inMinutes.toString().padLeft(2, '0');
+  final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+  return '$m:$s';
+}
+
+class _ChallengeCta extends ConsumerWidget {
+  const _ChallengeCta({required this.challenge});
+  final ChallengeModel challenge;
+
+  Future<void> _onTap(
+      BuildContext context, WidgetRef ref, bool isStarted) async {
+    final notifier = ref.read(challengeProvider.notifier);
+
+    if (isStarted) {
+      final done = await notifier.completeChallenge(challenge.id);
+      if (!context.mounted) return;
+      if (done) {
+        ToastUtil.success(
+            context, '${challenge.emoji} Challenge completed! 🎉');
+        Navigator.of(context).pop();
+      } else {
+        ToastUtil.error(
+          context,
+          ref.read(challengeProvider).error ??
+              'Could not complete the challenge.',
+        );
+      }
+      return;
+    }
+
+    final ok = await notifier.startChallenge(
+      challenge.id,
+      duration: Duration(minutes: challenge.durationMinutes),
+    );
+    if (!context.mounted) return;
+    if (ok) {
+      ToastUtil.success(
+        context,
+        '${challenge.emoji} Challenge started! Good luck!',
+      );
+    } else {
+      ToastUtil.error(
+        context,
+        ref.read(challengeProvider).error ?? 'Could not start the challenge.',
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final id = challenge.id;
+    // Rebuild every second while a countdown is running.
+    ref.watch(_ctaTickerProvider);
+    final isStarted = ref.watch(
+      challengeProvider.select((s) => s.isStarted(id)),
+    );
+    final isStarting = ref.watch(
+      challengeProvider.select((s) => s.startingId == id),
+    );
+    final isCompleting = ref.watch(
+      challengeProvider.select((s) => s.completingId == id),
+    );
+    final completableAt = ref.watch(
+      challengeProvider.select((s) => s.completableTimeFor(id)),
+    );
+
+    final remaining = completableAt == null
+        ? Duration.zero
+        : completableAt.difference(DateTime.now());
+    final inProgress = isStarted && remaining > Duration.zero;
+
+    final label = !isStarted
+        ? 'Start Challenge 🚀'
+        : inProgress
+            ? 'Complete in ${_formatRemaining(remaining)} ⏳'
+            : 'Complete Challenge ✅';
+
+    final button = GradientButton(
+      label: label,
+      gradient: challenge.gradient,
+      isLoading: isStarting || isCompleting,
+      // Disabled while the timer is running.
+      onTap: inProgress ? null : () => _onTap(context, ref, isStarted),
+      width: double.infinity,
+      height: 58,
+    );
+
+    // Dim the button while it's a disabled countdown to signal it's locked.
+    return Opacity(opacity: inProgress ? 0.6 : 1, child: button);
   }
 }
 
@@ -336,6 +417,80 @@ class _Tag extends StatelessWidget {
       child: Text(
         label,
         style: AppTextStyles.labelSmall.copyWith(color: Colors.white),
+      ),
+    );
+  }
+}
+
+/// A single row in the challenge "Shared with" list: avatar, username and level.
+class _SharedConnectionRow extends StatelessWidget {
+  const _SharedConnectionRow({required this.connection});
+  final SharedConnection connection;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = connection.username;
+    Widget avatarFallback() => Center(
+          child: name.isEmpty
+              ? const Icon(Icons.person_rounded,
+                  color: AppColors.textSecondary, size: 20)
+              : Text(
+                  name[0].toUpperCase(),
+                  style: AppTextStyles.titleMedium
+                      .copyWith(color: AppColors.primaryLight),
+                ),
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.background,
+              border: Border.all(color: AppColors.cardBorder),
+            ),
+            child: ClipOval(
+              child: connection.avatarUrl.isEmpty
+                  ? avatarFallback()
+                  : CachedNetworkImage(
+                      imageUrl: ApiEndpoints.mediaUrl(connection.avatarUrl),
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => avatarFallback(),
+                      errorWidget: (_, __, ___) => avatarFallback(),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              name.isEmpty ? 'Unknown' : name,
+              style: AppTextStyles.titleMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              'Lv.${connection.level}',
+              style: AppTextStyles.labelSmall
+                  .copyWith(color: Colors.white, fontSize: 10),
+            ),
+          ),
+        ],
       ),
     );
   }

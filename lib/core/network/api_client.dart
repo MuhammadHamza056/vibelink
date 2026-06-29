@@ -56,6 +56,67 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> put(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    try {
+      final res = await _dio.put(path, data: body);
+      return _handle(res);
+    } on DioException catch (e) {
+      throw ApiException(_messageFor(e));
+    }
+  }
+
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    try {
+      final res = await _dio.patch(path, data: body);
+      return _handle(res);
+    } on DioException catch (e) {
+      throw ApiException(_messageFor(e));
+    }
+  }
+
+  /// PATCHes [path] as multipart/form-data: [fields] become form fields and,
+  /// when [filePath] is given, the file is attached under [fileField]. Used to
+  /// update the profile with a freshly picked/captured avatar image.
+  Future<Map<String, dynamic>> patchMultipart(
+    String path, {
+    required Map<String, dynamic> fields,
+    String? filePath,
+    String fileField = 'avatar',
+  }) async {
+    try {
+      final form = FormData.fromMap({
+        ...fields,
+        if (filePath != null)
+          fileField: await MultipartFile.fromFile(
+            filePath,
+            filename: filePath.split('/').last,
+          ),
+      });
+      final res = await _dio.patch(path, data: form);
+      return _handle(res);
+    } on DioException catch (e) {
+      throw ApiException(_messageFor(e));
+    }
+  }
+
+  Future<Map<String, dynamic>> delete(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    try {
+      final res = await _dio.delete(path, data: body);
+      return _handle(res);
+    } on DioException catch (e) {
+      throw ApiException(_messageFor(e));
+    }
+  }
+
   Map<String, dynamic> _handle(Response res) {
     final status = res.statusCode ?? 0;
     final data = res.data;

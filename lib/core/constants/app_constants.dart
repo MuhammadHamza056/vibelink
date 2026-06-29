@@ -53,6 +53,8 @@ class AppConstants {
   static const String routeMemories = '/memories';
   static const String routeProfile = '/profile';
   static const String routeChallengeDetail = '/challenge/:id';
+  static const String routeNotifications = '/notifications';
+  static const String routeConnections = '/connections';
 
   // Vibe Tags
   static const List<String> vibeTags = [

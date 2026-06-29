@@ -8,6 +8,9 @@ import '../../../core/constants/app_constants.dart';
 import '../../../shared/widgets/gradient_button.dart';
 import '../providers/auth_provider.dart';
 
+/// Current onboarding page index. Auto-disposes when the screen is left.
+final _onboardingPageProvider = AutoDisposeStateProvider<int>((ref) => 0);
+
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -17,7 +20,6 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _pageController = PageController();
-  int _currentPage = 0;
 
   static const _pages = [
     _OnboardingPage(
@@ -41,7 +43,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   ];
 
   void _nextPage() {
-    if (_currentPage < _pages.length - 1) {
+    if (ref.read(_onboardingPageProvider) < _pages.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 400),
         curve: Curves.easeOutCubic,
@@ -68,6 +70,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentPage = ref.watch(_onboardingPageProvider);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
@@ -81,7 +84,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               height: 280,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _pages[_currentPage].gradient.colors.first
+                color: _pages[currentPage].gradient.colors.first
                     .withValues(alpha: 0.15),
               ),
             ),
@@ -94,7 +97,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _pages[_currentPage].gradient.colors.last
+                color: _pages[currentPage].gradient.colors.last
                     .withValues(alpha: 0.12),
               ),
             ),
@@ -119,7 +122,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 Expanded(
                   child: PageView.builder(
                     controller: _pageController,
-                    onPageChanged: (i) => setState(() => _currentPage = i),
+                    onPageChanged: (i) =>
+                        ref.read(_onboardingPageProvider.notifier).state = i,
                     itemCount: _pages.length,
                     itemBuilder: (_, i) => _OnboardingPageView(page: _pages[i]),
                   ),
@@ -132,13 +136,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     (i) => AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
                       margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: i == _currentPage ? 24 : 8,
+                      width: i == currentPage ? 24 : 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        gradient: i == _currentPage
-                            ? _pages[_currentPage].gradient
+                        gradient: i == currentPage
+                            ? _pages[currentPage].gradient
                             : null,
-                        color: i != _currentPage ? AppColors.cardBorder : null,
+                        color: i != currentPage ? AppColors.cardBorder : null,
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -149,10 +153,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: GradientButton(
-                    label: _currentPage == _pages.length - 1
+                    label: currentPage == _pages.length - 1
                         ? 'Get Started 🚀'
                         : 'Next',
-                    gradient: _pages[_currentPage].gradient,
+                    gradient: _pages[currentPage].gradient,
                     onTap: _nextPage,
                     width: double.infinity,
                   ),

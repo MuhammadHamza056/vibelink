@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/api_endpoints.dart';
 import '../../../core/utils/app_helpers.dart';
 import '../../../models/challenge_model.dart';
 import '../../../models/home_model.dart';
@@ -14,6 +16,7 @@ import '../../../shared/widgets/challenge_card.dart';
 import '../../../shared/widgets/safety_pulse_button.dart';
 import '../../../shared/widgets/streak_indicator.dart';
 import '../../../shared/widgets/vibe_card.dart';
+import '../../notifications/providers/notifications_provider.dart';
 import '../providers/home_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -203,21 +206,100 @@ class _AppBar extends StatelessWidget {
               ),
               Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications_rounded,
-                        color: AppColors.textSecondary),
-                    onPressed: () {},
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.settings_rounded,
-                        color: AppColors.textSecondary),
-                    onPressed: () {},
+                  const _NotificationBell(),
+                  const SizedBox(width: 4),
+                  // Avatar from GET /api/profile; tapping opens the profile tab.
+                  GestureDetector(
+                    onTap: () => context.go(AppConstants.routeProfile),
+                    child: _ProfileAvatar(profile: profile),
                   ),
                 ],
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Bell icon for the home app bar. Shows a dot when there are pending
+/// notifications and opens the notifications page on tap.
+class _NotificationBell extends ConsumerWidget {
+  const _NotificationBell();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pending = ref.watch(
+      notificationsProvider.select((s) => s.pendingCount),
+    );
+    return IconButton(
+      onPressed: () => context.push(AppConstants.routeNotifications),
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(Icons.notifications_rounded,
+              color: AppColors.textSecondary),
+          if (pending > 0)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.background, width: 1.5),
+                ),
+                constraints: const BoxConstraints(minWidth: 8, minHeight: 8),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small circular avatar for the home app bar, fed by GET /api/profile.
+/// Falls back to the username's initial (or a person icon) when no image
+/// is available or the network image fails to load.
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({this.profile});
+  final UserModel? profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final username = profile?.username ?? '';
+    final avatarUrl = profile?.avatarUrl ?? '';
+
+    Widget fallback() => Center(
+          child: username.isEmpty
+              ? const Icon(Icons.person_rounded,
+                  color: AppColors.textSecondary, size: 20)
+              : Text(
+                  username[0].toUpperCase(),
+                  style: AppTextStyles.titleMedium
+                      .copyWith(color: AppColors.primaryLight),
+                ),
+        );
+
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.cardBg,
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: ClipOval(
+        child: avatarUrl.isEmpty
+            ? fallback()
+            : CachedNetworkImage(
+                imageUrl: ApiEndpoints.mediaUrl(avatarUrl),
+                fit: BoxFit.cover,
+                placeholder: (_, __) => fallback(),
+                errorWidget: (_, __, ___) => fallback(),
+              ),
       ),
     );
   }

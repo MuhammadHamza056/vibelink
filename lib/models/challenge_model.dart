@@ -7,6 +7,35 @@ enum ChallengeDifficulty { easy, medium, hard }
 
 enum ChallengeStatus { available, active, completed, expired }
 
+/// A connection a challenge has been shared with (from `sharedWith` on the
+/// GET /api/challenges payload).
+class SharedConnection {
+  const SharedConnection({
+    required this.connectionId,
+    required this.userId,
+    required this.username,
+    required this.avatarUrl,
+    required this.level,
+  });
+
+  final String connectionId;
+  final String userId;
+  final String username;
+  final String avatarUrl;
+  final int level;
+
+  factory SharedConnection.fromJson(Map<String, dynamic> json) {
+    final user = (json['user'] as Map<String, dynamic>?) ?? const {};
+    return SharedConnection(
+      connectionId: (json['connectionId'] ?? '').toString(),
+      userId: (user['id'] ?? user['_id'] ?? '').toString(),
+      username: (user['username'] ?? '') as String,
+      avatarUrl: (user['avatarUrl'] ?? '') as String,
+      level: (user['level'] ?? 1) as int,
+    );
+  }
+}
+
 class ChallengeModel {
   const ChallengeModel({
     required this.id,
@@ -24,6 +53,8 @@ class ChallengeModel {
     required this.expiresAt,
     this.isTrending = false,
     this.isDaily = false,
+    this.isShared = false,
+    this.sharedWith = const [],
   });
 
   final String id;
@@ -41,6 +72,12 @@ class ChallengeModel {
   final DateTime expiresAt;
   final bool isTrending;
   final bool isDaily;
+
+  /// Whether this challenge has been shared with any connections.
+  final bool isShared;
+
+  /// Connections this challenge has been shared with.
+  final List<SharedConnection> sharedWith;
 
   /// Builds a challenge from the GET /api/challenges payload. The backend has
   /// no participant counts, status or expiry, so those default; `vibeTags`
@@ -65,6 +102,12 @@ class ChallengeModel {
               ?.add(const Duration(days: 1)) ??
           DateTime.now().add(const Duration(days: 1)),
       isTrending: xpReward >= 120,
+      isShared: (json['isShared'] ?? false) as bool,
+      sharedWith: (json['sharedWith'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .map(SharedConnection.fromJson)
+              .toList() ??
+          const [],
     );
   }
 

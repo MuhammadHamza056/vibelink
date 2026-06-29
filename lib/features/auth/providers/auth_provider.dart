@@ -1,9 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../models/user_model.dart';
+import '../../challenges/providers/challenge_provider.dart';
+import '../../connections/providers/connections_provider.dart';
+import '../../home/providers/home_provider.dart';
+import '../../match/providers/match_provider.dart';
+import '../../memories/providers/memories_provider.dart';
+import '../../notifications/providers/notifications_provider.dart';
+import '../../profile/providers/profile_provider.dart';
 
 class AuthState {
   const AuthState({
@@ -25,8 +31,6 @@ class AuthState {
   final UserModel? user;
   final String? accessToken;
   final String? refreshToken;
-
-  /// Latest server message (e.g. "Account created successfully").
   final String? message;
   final String? error;
 
@@ -58,7 +62,6 @@ class AuthState {
 class AuthNotifier extends Notifier<AuthState> {
   @override
   AuthState build() {
-    // Restore a persisted session loaded from secure storage at app start.
     final tokens = ref.read(bootstrapTokensProvider);
     final seenOnboarding = ref.read(bootstrapOnboardingSeenProvider);
     final accessToken = tokens.accessToken;
@@ -74,10 +77,6 @@ class AuthNotifier extends Notifier<AuthState> {
     return AuthState(hasSeenOnboarding: seenOnboarding);
   }
 
-  /// Registers a new account against POST /api/auth/register.
-  ///
-  /// Returns `true` on success; on failure sets [AuthState.error] and
-  /// returns `false` so the UI can show the message.
   Future<bool> register({
     required String email,
     required String username,
@@ -95,8 +94,6 @@ class AuthNotifier extends Notifier<AuthState> {
         },
       );
 
-      // Registration does NOT log the user in — they sign in afterwards on
-      // the login screen. So we only surface the server message here.
       state = state.copyWith(
         isLoading: false,
         message: res['message'] as String?,
@@ -111,10 +108,6 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  /// Signs in against POST /api/auth/login.
-  ///
-  /// Returns `true` on success; on failure sets [AuthState.error] and
-  /// returns `false` so the UI can show the message.
   Future<bool> signInWithEmail(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null, message: null);
     try {
@@ -127,8 +120,9 @@ class AuthNotifier extends Notifier<AuthState> {
         },
       );
 
-      final accessToken =
-          (res['accessToken'] ?? res['token'] ?? res['access_token']) as String?;
+      final accessToken = (res['accessToken'] ??
+          res['token'] ??
+          res['access_token']) as String?;
       final refreshToken =
           (res['refreshToken'] ?? res['refresh_token']) as String?;
       final userJson = res['user'];
@@ -136,14 +130,13 @@ class AuthNotifier extends Notifier<AuthState> {
           ? UserModel.fromJson(userJson)
           : null;
 
-      // Authorize subsequent requests with the issued token and persist the
-      // session so it survives an app restart.
       client.setAuthToken(accessToken);
       await ref.read(tokenStorageProvider).saveTokens(
             accessToken: accessToken,
             refreshToken: refreshToken,
           );
 
+      _resetUserScopedProviders();
       state = state.copyWith(
         isLoading: false,
         isAuthenticated: true,
@@ -183,8 +176,6 @@ class AuthNotifier extends Notifier<AuthState> {
     );
   }
 
-  /// Marks onboarding complete in state and persists it to secure storage so
-  /// it survives restarts and sign-out.
   Future<void> completeOnboarding() async {
     state = state.copyWith(hasSeenOnboarding: true);
     await ref.read(tokenStorageProvider).setOnboardingSeen();
@@ -193,17 +184,24 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> signOut() async {
     await ref.read(tokenStorageProvider).clear();
     ref.read(apiClientProvider).setAuthToken(null);
-    // Keep hasSeenOnboarding so logout returns to login, not onboarding.
+    _resetUserScopedProviders();
     state = const AuthState(hasSeenOnboarding: true);
+  }
+
+  void _resetUserScopedProviders() {
+    ref.invalidate(homeProvider);
+    ref.invalidate(profileProvider);
+    ref.invalidate(matchProvider);
+    ref.invalidate(challengeProvider);
+    ref.invalidate(memoriesProvider);
+    ref.invalidate(notificationsProvider);
+    ref.invalidate(connectionsProvider);
   }
 }
 
-final authProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+final authProvider =
+    NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
 
-/// UI-only state for the auth form: which mode (sign up vs. login) is showing
-/// and whether the password is obscured. Kept in Riverpod so [AuthScreen]
-/// needs no [setState]. Auto-disposes, so the form resets when the screen is
-/// left — matching the previous StatefulWidget behaviour.
 class AuthFormState {
   const AuthFormState({this.isSignUp = false, this.obscurePassword = true});
 

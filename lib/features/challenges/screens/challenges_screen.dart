@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../shared/widgets/challenge_card.dart';
 import '../providers/challenge_provider.dart';
@@ -38,23 +39,26 @@ class ChallengesScreen extends ConsumerWidget {
                           ),
                         ),
                         const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.cardBg,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.cardBorder),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.map_rounded,
-                                  size: 16, color: AppColors.cyan),
-                              const SizedBox(width: 6),
-                              Text('Nearby',
-                                  style: AppTextStyles.labelSmall
-                                      .copyWith(color: AppColors.cyan)),
-                            ],
+                        GestureDetector(
+                          onTap: () => context.go(AppConstants.routeMatch),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.cardBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.cardBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.map_rounded,
+                                    size: 16, color: AppColors.cyan),
+                                const SizedBox(width: 6),
+                                Text('Nearby',
+                                    style: AppTextStyles.labelSmall
+                                        .copyWith(color: AppColors.cyan)),
+                              ],
+                            ),
                           ),
                         ),
                       ],

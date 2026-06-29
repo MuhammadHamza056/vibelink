@@ -66,21 +66,26 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         .signInWithEmail(_emailCtrl.text.trim(), _passCtrl.text);
     if (!mounted) return;
     if (ok) {
+      // Toast on the root overlay survives the route change to home.
+      ToastUtil.success(
+        context,
+        ref.read(authProvider).message ?? 'Welcome back! 👋',
+      );
       context.go(AppConstants.routeHome);
     } else {
       ToastUtil.error(context, ref.read(authProvider).error ?? 'Login failed');
     }
   }
 
-  Future<void> _onGoogle() async {
-    await ref.read(authProvider.notifier).signInWithGoogle();
-    if (mounted) context.go(AppConstants.routeHome);
-  }
+  // Future<void> _onGoogle() async {
+  //   await ref.read(authProvider.notifier).signInWithGoogle();
+  //   if (mounted) context.go(AppConstants.routeHome);
+  // }
 
-  Future<void> _onApple() async {
-    await ref.read(authProvider.notifier).signInWithApple();
-    if (mounted) context.go(AppConstants.routeHome);
-  }
+  // Future<void> _onApple() async {
+  //   await ref.read(authProvider.notifier).signInWithApple();
+  //   if (mounted) context.go(AppConstants.routeHome);
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -154,7 +159,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         ? 'Create your\naccount ✨'
                         : 'Welcome\nback 👋',
                     style: AppTextStyles.displayMedium,
-                  ).animate(delay: 100.ms).fadeIn(duration: 500.ms).slideY(begin: 0.2, end: 0),
+                  )
+                      .animate(delay: 100.ms)
+                      .fadeIn(duration: 500.ms)
+                      .slideY(begin: 0.2, end: 0),
                   const SizedBox(height: 8),
                   Text(
                     form.isSignUp
@@ -164,32 +172,32 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
                   const SizedBox(height: 36),
                   // Social buttons
-                  _SocialAuthButton(
-                    label: 'Continue with Google',
-                    emoji: 'G',
-                    onTap: _onGoogle,
-                    isLoading: auth.isLoading,
-                  ).animate(delay: 250.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
-                  const SizedBox(height: 12),
-                  _SocialAuthButton(
-                    label: 'Continue with Apple',
-                    emoji: '',
-                    icon: Icons.apple_rounded,
-                    onTap: _onApple,
-                    isLoading: auth.isLoading,
-                  ).animate(delay: 300.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
-                  const SizedBox(height: 24),
-                  // Divider
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: AppColors.cardBorder)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('or', style: AppTextStyles.bodySmall),
-                      ),
-                      Expanded(child: Divider(color: AppColors.cardBorder)),
-                    ],
-                  ).animate(delay: 350.ms).fadeIn(),
+                  // _SocialAuthButton(
+                  //   label: 'Continue with Google',
+                  //   emoji: 'G',
+                  //   onTap: _onGoogle,
+                  //   isLoading: auth.isLoading,
+                  // ).animate(delay: 250.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
+                  // const SizedBox(height: 12),
+                  // _SocialAuthButton(
+                  //   label: 'Continue with Apple',
+                  //   emoji: '',
+                  //   icon: Icons.apple_rounded,
+                  //   onTap: _onApple,
+                  //   isLoading: auth.isLoading,
+                  // ).animate(delay: 300.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
+                  // const SizedBox(height: 24),
+                  // // Divider
+                  // Row(
+                  //   children: [
+                  //     Expanded(child: Divider(color: AppColors.cardBorder)),
+                  //     Padding(
+                  //       padding: const EdgeInsets.symmetric(horizontal: 16),
+                  //       child: Text('or', style: AppTextStyles.bodySmall),
+                  //     ),
+                  //     Expanded(child: Divider(color: AppColors.cardBorder)),
+                  //   ],
+                  // ).animate(delay: 350.ms).fadeIn(),
                   const SizedBox(height: 24),
                   // Email field
                   _GlassTextField(
@@ -197,7 +205,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     hint: 'Email address',
                     icon: Icons.email_rounded,
                     keyboardType: TextInputType.emailAddress,
-                  ).animate(delay: 400.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
+                  )
+                      .animate(delay: 400.ms)
+                      .fadeIn(duration: 400.ms)
+                      .slideY(begin: 0.1, end: 0),
                   const SizedBox(height: 12),
                   // Username field (sign up only)
                   if (form.isSignUp) ...[
@@ -206,7 +217,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       hint: 'Username',
                       icon: Icons.person_rounded,
                       keyboardType: TextInputType.name,
-                    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0),
+                    )
+                        .animate()
+                        .fadeIn(duration: 300.ms)
+                        .slideY(begin: 0.1, end: 0),
                     const SizedBox(height: 12),
                   ],
                   // Password field
@@ -226,7 +240,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       onPressed: () =>
                           ref.read(authFormProvider.notifier).toggleObscure(),
                     ),
-                  ).animate(delay: 450.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
+                  )
+                      .animate(delay: 450.ms)
+                      .fadeIn(duration: 400.ms)
+                      .slideY(begin: 0.1, end: 0),
                   const SizedBox(height: 28),
                   GradientButton(
                     label: form.isSignUp ? 'Create Account' : 'Sign In',
@@ -323,57 +340,6 @@ class _GlassTextField extends StatelessWidget {
             ),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SocialAuthButton extends StatelessWidget {
-  const _SocialAuthButton({
-    required this.label,
-    required this.emoji,
-    required this.onTap,
-    this.icon,
-    this.isLoading = false,
-  });
-
-  final String label;
-  final String emoji;
-  final IconData? icon;
-  final VoidCallback onTap;
-  final bool isLoading;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.cardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.cardBorder),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (icon != null)
-                  Icon(icon, color: AppColors.textPrimary, size: 22)
-                else
-                  Text(emoji,
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w800,
-                          color: Colors.white)),
-                const SizedBox(width: 12),
-                Text(label, style: AppTextStyles.titleMedium),
-              ],
-            ),
           ),
         ),
       ),

@@ -11,7 +11,18 @@ class ApiEndpoints {
   /// Override via `--dart-define=API_BASE_URL=...` to point elsewhere.
   static String get baseUrl {
     if (_override.isNotEmpty) return _override;
-    return 'https://3105-221-132-118-98.ngrok-free.app';
+    return 'https://8125-103-177-241-226.ngrok-free.app';
+  }
+
+  /// Resolves a possibly-relative media path returned by the API (e.g.
+  /// "/uploads/avatars/x.jpg") into an absolute URL against [baseUrl].
+  /// Absolute URLs and empty strings are returned unchanged.
+  static String mediaUrl(String path) {
+    if (path.isEmpty) return path;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    final base =
+        baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    return '$base${path.startsWith('/') ? '' : '/'}$path';
   }
 
   // ---- Auth ----
@@ -23,6 +34,22 @@ class ApiEndpoints {
 
   // ---- Profile ----
   static const String profile = '/api/profile';
+  static const String profileLocation = '/api/profile/location';
+  static const String profileVibeTags = '/api/profile/vibe-tags';
+
+  // ---- Match ----
+  static const String matchNearby = '/api/match/nearby';
+  static const String matchConnect = '/api/match/connect';
+  static const String matchConnections = '/api/match/connections';
+  static String matchConnectionLeave(String connectionId) =>
+      '/api/match/connections/$connectionId';
+
+  // ---- Notifications ----
+  static const String notifications = '/api/notifications';
+  static String notificationAccept(String id) =>
+      '/api/notifications/$id/accept';
+  static String notificationReject(String id) =>
+      '/api/notifications/$id/reject';
 
   // ---- Memories ----
   static const String memories = '/api/memories';

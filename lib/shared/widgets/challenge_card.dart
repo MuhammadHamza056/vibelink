@@ -224,6 +224,23 @@ class _CompactChallengeCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                      if (challenge.isShared) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(Icons.people_alt_rounded,
+                                size: 12, color: AppColors.green),
+                            const SizedBox(width: 4),
+                            Text(
+                              challenge.sharedWith.length == 1
+                                  ? 'Shared with 1'
+                                  : 'Shared with ${challenge.sharedWith.length}',
+                              style: AppTextStyles.labelSmall
+                                  .copyWith(color: AppColors.green),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

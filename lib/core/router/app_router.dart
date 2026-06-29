@@ -8,9 +8,11 @@ import '../../features/auth/screens/onboarding_screen.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/challenges/screens/challenge_detail_screen.dart';
 import '../../features/challenges/screens/challenges_screen.dart';
+import '../../features/connections/screens/connections_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/match/screens/match_screen.dart';
 import '../../features/memories/screens/memories_screen.dart';
+import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/shell/shell_screen.dart';
 import '../constants/app_constants.dart';
@@ -79,6 +81,16 @@ final List<RouteBase> _routes = [
     parentNavigatorKey: _rootNavigatorKey,
     builder: (_, state) =>
         ChallengeDetailScreen(id: state.pathParameters['id']!),
+  ),
+  GoRoute(
+    path: AppConstants.routeNotifications,
+    parentNavigatorKey: _rootNavigatorKey,
+    builder: (_, __) => const NotificationsScreen(),
+  ),
+  GoRoute(
+    path: AppConstants.routeConnections,
+    parentNavigatorKey: _rootNavigatorKey,
+    builder: (_, __) => const ConnectionsScreen(),
   ),
   ShellRoute(
     navigatorKey: _shellNavigatorKey,

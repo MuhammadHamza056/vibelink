@@ -13,6 +13,7 @@ class ChallengeState {
     this.activeChallenge,
     this.error,
     this.activeChallengeIds = const {},
+    this.completableAt = const {},
     this.startingId,
     this.completingId,
   });
@@ -25,6 +26,10 @@ class ChallengeState {
 
   /// Ids of challenges the user has started (POST .../start succeeded).
   final Set<String> activeChallengeIds;
+
+  /// For each started challenge, the time at which its timer elapses and it can
+  /// be completed. Until then the "Complete" CTA stays disabled.
+  final Map<String, DateTime> completableAt;
 
   /// Id of the challenge whose start request is currently in flight.
   final String? startingId;
@@ -40,6 +45,16 @@ class ChallengeState {
 
   bool isStarted(String id) => activeChallengeIds.contains(id);
 
+  /// When the [id] challenge becomes completable, or null if it's not started.
+  DateTime? completableTimeFor(String id) => completableAt[id];
+
+  /// True once a started challenge's timer has elapsed (or it has no timer).
+  bool isCompletable(String id) {
+    if (!isStarted(id)) return false;
+    final at = completableAt[id];
+    return at == null || !DateTime.now().isBefore(at);
+  }
+
   ChallengeState copyWith({
     List<ChallengeModel>? challenges,
     ChallengeFilter? filter,
@@ -47,6 +62,7 @@ class ChallengeState {
     ChallengeModel? activeChallenge,
     String? error,
     Set<String>? activeChallengeIds,
+    Map<String, DateTime>? completableAt,
     String? startingId,
     String? completingId,
   }) {
@@ -57,6 +73,7 @@ class ChallengeState {
       activeChallenge: activeChallenge ?? this.activeChallenge,
       error: error,
       activeChallengeIds: activeChallengeIds ?? this.activeChallengeIds,
+      completableAt: completableAt ?? this.completableAt,
       startingId: startingId,
       completingId: completingId,
     );
@@ -106,12 +123,17 @@ class ChallengeNotifier extends Notifier<ChallengeState> {
   /// is recorded in [ChallengeState.activeChallengeIds] so the UI can flip the
   /// CTA to "Complete". Returns `true` on success, `false` otherwise (with the
   /// reason left in [ChallengeState.error]).
-  Future<bool> startChallenge(String id) async {
+  Future<bool> startChallenge(String id, {Duration duration = Duration.zero}) async {
     state = state.copyWith(startingId: id);
     try {
       await ref.read(apiClientProvider).post(ApiEndpoints.challengeStart(id));
       state = state.copyWith(
         activeChallengeIds: {...state.activeChallengeIds, id},
+        // Start the challenge timer; the CTA stays disabled until it elapses.
+        completableAt: {
+          ...state.completableAt,
+          id: DateTime.now().add(duration),
+        },
         // startingId omitted → cleared.
       );
       return true;
@@ -135,6 +157,7 @@ class ChallengeNotifier extends Notifier<ChallengeState> {
       state = state.copyWith(
         activeChallengeIds:
             state.activeChallengeIds.where((c) => c != id).toSet(),
+        completableAt: {...state.completableAt}..remove(id),
         // completingId omitted → cleared.
       );
       return true;

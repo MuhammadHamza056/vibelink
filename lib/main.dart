@@ -14,9 +14,6 @@ Future<void> main() async {
       systemNavigationBarColor: Colors.transparent,
     ),
   );
-
-  // Load any persisted session before the app builds so the router can gate
-  // the first frame straight to login, onboarding or home.
   final tokenStorage = TokenStorage();
   final accessToken = await tokenStorage.readAccessToken();
   final refreshToken = await tokenStorage.readRefreshToken();
