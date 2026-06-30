@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
@@ -119,6 +120,8 @@ class AuthNotifier extends Notifier<AuthState> {
           'password': password,
         },
       );
+
+      debugPrint('🔐 Login response: $res');
 
       final accessToken = (res['accessToken'] ??
           res['token'] ??

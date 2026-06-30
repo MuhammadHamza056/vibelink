@@ -11,7 +11,8 @@ class ApiEndpoints {
   /// Override via `--dart-define=API_BASE_URL=...` to point elsewhere.
   static String get baseUrl {
     if (_override.isNotEmpty) return _override;
-    return 'https://8125-103-177-241-226.ngrok-free.app';
+    return 'https://vibelinkbackend.vercel.app';
+    // return 'https://8125-103-177-241-226.ngrok-free.app';
   }
 
   /// Resolves a possibly-relative media path returned by the API (e.g.
@@ -20,8 +21,9 @@ class ApiEndpoints {
   static String mediaUrl(String path) {
     if (path.isEmpty) return path;
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
-    final base =
-        baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final base = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
     return '$base${path.startsWith('/') ? '' : '/'}$path';
   }
 
