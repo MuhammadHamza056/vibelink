@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../shared/widgets/memory_bubble_card.dart';
 import '../providers/memories_provider.dart';
+import '../widgets/add_memory_sheet.dart';
 
 class MemoriesScreen extends ConsumerWidget {
   const MemoriesScreen({super.key});
@@ -36,22 +37,25 @@ class MemoriesScreen extends ConsumerWidget {
                           ),
                         ),
                         const Spacer(),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            gradient: AppColors.goldGradient,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.gold.withValues(alpha: 0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
+                        GestureDetector(
+                          onTap: () => AddMemorySheet.show(context),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              gradient: AppColors.goldGradient,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.gold.withValues(alpha: 0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(Icons.add_rounded,
+                                color: Colors.white, size: 22),
                           ),
-                          child: const Icon(Icons.add_rounded,
-                              color: Colors.white, size: 22),
                         ),
                       ],
                     ).animate().fadeIn(duration: 400.ms),

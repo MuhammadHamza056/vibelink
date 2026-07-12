@@ -31,6 +31,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _onEmailAuth() async {
+    // Drop the keyboard first, otherwise the bottom-anchored toast renders
+    // behind it and is never seen (esp. after sign-up, which stays on-screen).
+    FocusScope.of(context).unfocus();
     final isSignUp = ref.read(authFormProvider).isSignUp;
     final needsUsername = isSignUp && _usernameCtrl.text.trim().isEmpty;
     if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty || needsUsername) {

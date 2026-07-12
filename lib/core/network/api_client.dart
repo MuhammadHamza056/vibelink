@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_endpoints.dart';
@@ -80,6 +81,34 @@ class ApiClient {
     }
   }
 
+  /// POSTs [path] as multipart/form-data: [fields] become form fields and,
+  /// when [filePath] is given, the file is attached under [fileField]. Used to
+  /// create a memory with a freshly picked/captured image.
+  Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    required Map<String, dynamic> fields,
+    String? filePath,
+    String fileField = 'image',
+  }) async {
+    try {
+      final form = FormData.fromMap({
+        ...fields,
+        if (filePath != null)
+          fileField: await MultipartFile.fromFile(
+            filePath,
+            filename: filePath.split('/').last,
+          ),
+      });
+      debugPrint('📤 POST $path multipart | '
+          'fields: ${form.fields} | '
+          'files: ${form.files.map((f) => '${f.key}=${f.value.filename}').toList()}');
+      final res = await _dio.post(path, data: form);
+      return _handle(res);
+    } on DioException catch (e) {
+      throw ApiException(_messageFor(e));
+    }
+  }
+
   /// PATCHes [path] as multipart/form-data: [fields] become form fields and,
   /// when [filePath] is given, the file is attached under [fileField]. Used to
   /// update the profile with a freshly picked/captured avatar image.
@@ -124,12 +153,38 @@ class ApiClient {
 
     if (status >= 200 && status < 300) return map;
 
-    // Surface the server's message when present, otherwise a generic one.
-    final serverMsg = map['message'] ?? map['error'];
-    throw ApiException(
-      serverMsg is String ? serverMsg : 'Request failed ($status)',
-      statusCode: status,
-    );
+    // Log the raw failure so validation errors are visible during debugging.
+    debugPrint('❌ API ${res.requestOptions.method} '
+        '${res.requestOptions.path} → $status | body: $data');
+
+    // Fall back to the raw body so the error is readable even without a
+    // console (shown in the toast). Truncated to keep it presentable.
+    final raw = data == null ? '' : data.toString();
+    final fallback = raw.isEmpty
+        ? 'Request failed ($status)'
+        : 'Request failed ($status): '
+            '${raw.length > 300 ? '${raw.substring(0, 300)}…' : raw}';
+
+    throw ApiException(_extractError(map) ?? fallback, statusCode: status);
+  }
+
+  /// Digs a human-readable message out of the common error-body shapes:
+  /// {message}, {error}, {error:{message}}, or {errors:[{msg|message}]}.
+  String? _extractError(Map<String, dynamic> map) {
+    final msg = map['message'] ?? map['error'] ?? map['msg'];
+    if (msg is String && msg.isNotEmpty) return msg;
+    if (msg is Map && msg['message'] is String) return msg['message'] as String;
+
+    final errors = map['errors'];
+    if (errors is List && errors.isNotEmpty) {
+      final first = errors.first;
+      if (first is String) return first;
+      if (first is Map) {
+        final m = first['msg'] ?? first['message'];
+        if (m is String) return m;
+      }
+    }
+    return null;
   }
 
   String _messageFor(DioException e) {

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze *)",
+      "Bash(DIO=/Users/unknown1/.pub-cache/hosted/pub.dev/dio-5.9.2; sed -n '630,655p' \"$DIO/lib/src/dio_mixin.dart\")",
+      "Read(//Users/unknown1/.pub-cache/hosted/pub.dev/dio-5.9.2/lib/src/**)"
+    ]
+  }
+}
