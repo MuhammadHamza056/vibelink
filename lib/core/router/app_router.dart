@@ -42,23 +42,20 @@ String? _redirect(GoRouterState state, AuthState authState) {
   final isOnOnboarding = loc == AppConstants.routeOnboarding;
   final isOnAuth = loc == AppConstants.routeAuth;
 
-  // Let the splash screen play and decide the first destination.
-  if (isOnSplash) return null;
-
-  // Signed in: never sit on the auth/onboarding screens.
+  // Signed in: immediately go to home if on splash, auth, or onboarding.
   if (isAuth) {
-    if (isOnAuth || isOnOnboarding) return AppConstants.routeHome;
+    if (isOnSplash || isOnAuth || isOnOnboarding) return AppConstants.routeHome;
     return null;
   }
 
   // Signed out and onboarding not done yet → force onboarding.
   if (!seenOnboarding) {
-    return isOnOnboarding ? null : AppConstants.routeOnboarding;
+    if (isOnSplash || !isOnOnboarding) return AppConstants.routeOnboarding;
+    return null;
   }
 
-  // Signed out but onboarding already seen → send to login, and don't allow
-  // going back to the onboarding screen.
-  if (!isOnAuth) return AppConstants.routeAuth;
+  // Signed out and onboarding already seen → force auth screen.
+  if (isOnSplash || !isOnAuth) return AppConstants.routeAuth;
   return null;
 }
 

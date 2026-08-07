@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../models/notification_model.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class NotificationsState {
   const NotificationsState({
@@ -58,6 +59,11 @@ class NotificationsNotifier extends Notifier<NotificationsState> {
   /// Fetches the user's notifications from GET /api/notifications. The payload's
   /// `body` holds `count`, `pendingCount` and the `notifications` array.
   Future<void> _load() async {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.accessToken == null || auth.accessToken!.isEmpty) {
+      state = state.copyWith(isLoading: false);
+      return;
+    }
     try {
       final res =
           await ref.read(apiClientProvider).get(ApiEndpoints.notifications);

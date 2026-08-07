@@ -32,10 +32,6 @@ class AddMemorySheet extends ConsumerStatefulWidget {
 class _AddMemorySheetState extends ConsumerState<AddMemorySheet> {
   final _titleCtrl = TextEditingController();
   final _captionCtrl = TextEditingController();
-  final _selectedTags = <String>{};
-  final _picker = ImagePicker();
-  String? _imagePath;
-  bool _submitting = false;
 
   @override
   void dispose() {
@@ -44,24 +40,11 @@ class _AddMemorySheetState extends ConsumerState<AddMemorySheet> {
     super.dispose();
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final file = await _picker.pickImage(
-        source: source,
-        maxWidth: 1280,
-        imageQuality: 85,
-      );
-      if (file == null) return;
-      setState(() => _imagePath = file.path);
-    } catch (_) {
-      if (mounted) {
-        ToastUtil.error(context, 'Could not access the photo. Check permissions.');
-      }
-    }
-  }
-
   void _showImageSourceSheet() {
     FocusScope.of(context).unfocus();
+    final formNotifier = ref.read(addMemoryFormProvider.notifier);
+    final imagePath = ref.read(addMemoryFormProvider).pickedImagePath;
+
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.background,
@@ -79,7 +62,7 @@ class _AddMemorySheetState extends ConsumerState<AddMemorySheet> {
               title: Text('Take Photo', style: AppTextStyles.bodyLarge),
               onTap: () {
                 Navigator.of(sheetCtx).pop();
-                _pickImage(ImageSource.camera);
+                formNotifier.pickImage(ImageSource.camera);
               },
             ),
             ListTile(
@@ -89,10 +72,10 @@ class _AddMemorySheetState extends ConsumerState<AddMemorySheet> {
                   Text('Choose from Gallery', style: AppTextStyles.bodyLarge),
               onTap: () {
                 Navigator.of(sheetCtx).pop();
-                _pickImage(ImageSource.gallery);
+                formNotifier.pickImage(ImageSource.gallery);
               },
             ),
-            if (_imagePath != null)
+            if (imagePath != null)
               ListTile(
                 leading: const Icon(Icons.delete_outline_rounded,
                     color: AppColors.error),
@@ -101,7 +84,7 @@ class _AddMemorySheetState extends ConsumerState<AddMemorySheet> {
                         .copyWith(color: AppColors.error)),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();
-                  setState(() => _imagePath = null);
+                  formNotifier.removeImage();
                 },
               ),
             const SizedBox(height: 8),
@@ -122,15 +105,18 @@ class _AddMemorySheetState extends ConsumerState<AddMemorySheet> {
       return;
     }
 
-    setState(() => _submitting = true);
+    final formNotifier = ref.read(addMemoryFormProvider.notifier);
+    final formState = ref.read(addMemoryFormProvider);
+
+    formNotifier.setSubmitting(true);
     final ok = await ref.read(memoriesProvider.notifier).createMemory(
           title: _titleCtrl.text.trim(),
           caption: _captionCtrl.text.trim(),
-          imageFilePath: _imagePath,
-          vibeTags: _selectedTags.toList(),
+          imageFilePath: formState.pickedImagePath,
+          vibeTags: formState.selectedTags.toList(),
         );
     if (!mounted) return;
-    setState(() => _submitting = false);
+    formNotifier.setSubmitting(false);
 
     if (ok) {
       Navigator.of(context).pop();
@@ -143,6 +129,9 @@ class _AddMemorySheetState extends ConsumerState<AddMemorySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final formState = ref.watch(addMemoryFormProvider);
+    final formNotifier = ref.read(addMemoryFormProvider.notifier);
+
     // Padding keeps the form above the keyboard when it opens.
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
@@ -193,7 +182,7 @@ class _AddMemorySheetState extends ConsumerState<AddMemorySheet> {
 
                 // Photo picker
                 _PhotoPicker(
-                  imagePath: _imagePath,
+                  imagePath: formState.pickedImagePath,
                   onTap: _showImageSourceSheet,
                 ),
                 const SizedBox(height: 18),
@@ -221,15 +210,9 @@ class _AddMemorySheetState extends ConsumerState<AddMemorySheet> {
                   spacing: 8,
                   runSpacing: 8,
                   children: AppConstants.vibeTags.map((tag) {
-                    final selected = _selectedTags.contains(tag);
+                    final selected = formState.selectedTags.contains(tag);
                     return GestureDetector(
-                      onTap: () => setState(() {
-                        if (selected) {
-                          _selectedTags.remove(tag);
-                        } else {
-                          _selectedTags.add(tag);
-                        }
-                      }),
+                      onTap: () => formNotifier.toggleTag(tag),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 150),
                         padding: const EdgeInsets.symmetric(
@@ -263,8 +246,8 @@ class _AddMemorySheetState extends ConsumerState<AddMemorySheet> {
                 GradientButton(
                   label: 'Save Memory',
                   gradient: AppColors.goldGradient,
-                  onTap: _submitting ? null : _submit,
-                  isLoading: _submitting,
+                  onTap: formState.isSubmitting ? null : _submit,
+                  isLoading: formState.isSubmitting,
                   width: double.infinity,
                 ),
               ],

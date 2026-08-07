@@ -185,10 +185,10 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> signOut() async {
+    state = const AuthState(hasSeenOnboarding: true);
     await ref.read(tokenStorageProvider).clear();
     ref.read(apiClientProvider).setAuthToken(null);
     _resetUserScopedProviders();
-    state = const AuthState(hasSeenOnboarding: true);
   }
 
   void _resetUserScopedProviders() {

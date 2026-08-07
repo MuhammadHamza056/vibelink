@@ -1,4 +1,4 @@
-package com.example.vibelink
+package com.vexobyte.vibelink
 
 import io.flutter.embedding.android.FlutterActivity
 

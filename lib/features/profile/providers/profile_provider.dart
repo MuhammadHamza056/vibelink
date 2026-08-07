@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../models/user_model.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class ProfileState {
   const ProfileState({
@@ -57,6 +58,13 @@ class ProfileNotifier extends Notifier<ProfileState> {
   /// in a `body` object, which we unwrap into [UserModel]. The selectable vibe
   /// tags are loaded concurrently and never block the profile itself.
   Future<void> _load() async {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated ||
+        auth.accessToken == null ||
+        auth.accessToken!.isEmpty) {
+      state = state.copyWith(isLoading: false);
+      return;
+    }
     final client = ref.read(apiClientProvider);
 
     // Best-effort: fetch the list of selectable vibe tags alongside the profile.
@@ -204,7 +212,6 @@ final profileProvider =
 
 /// Transient state for the Edit Profile sheet: the picked photo and the
 /// selected vibe tags. Auto-disposes so it resets each time the sheet is
-/// reopened — replaces the sheet's local [State]/setState.
 class EditProfileForm {
   const EditProfileForm({this.pickedImagePath, this.selectedTags = const {}});
 

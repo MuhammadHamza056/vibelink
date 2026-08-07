@@ -3,6 +3,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../models/challenge_model.dart';
+import '../../auth/providers/auth_provider.dart';
 
 enum ChallengeFilter { today, thisWeek, trending }
 
@@ -98,6 +99,11 @@ class ChallengeNotifier extends Notifier<ChallengeState> {
   /// Fetches challenges from GET /api/challenges. The payload's `body` is a
   /// JSON array, which we map into [ChallengeModel]s. Restores persisted active challenge timers.
   Future<void> _load() async {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.accessToken == null || auth.accessToken!.isEmpty) {
+      state = state.copyWith(isLoading: false);
+      return;
+    }
     try {
       final activeMap = await ref.read(tokenStorageProvider).readActiveChallenges();
       final res = await ref.read(apiClientProvider).get(ApiEndpoints.challenges);

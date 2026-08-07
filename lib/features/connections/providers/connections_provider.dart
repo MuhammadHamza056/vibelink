@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../models/connection_model.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class ConnectionsState {
   const ConnectionsState({
@@ -47,6 +48,11 @@ class ConnectionsNotifier extends Notifier<ConnectionsState> {
   /// Fetches the user's connections from GET /api/match/connections. The
   /// payload's `body` holds `count` and the `connections` array.
   Future<void> _load() async {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.accessToken == null || auth.accessToken!.isEmpty) {
+      state = state.copyWith(isLoading: false);
+      return;
+    }
     try {
       final res =
           await ref.read(apiClientProvider).get(ApiEndpoints.matchConnections);

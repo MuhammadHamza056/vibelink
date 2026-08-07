@@ -6,6 +6,7 @@ import '../../../core/network/api_endpoints.dart';
 import '../../../core/services/location_service.dart';
 import '../../../models/home_model.dart';
 import '../../../models/user_model.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class HomeState {
   const HomeState({
@@ -58,6 +59,11 @@ class HomeNotifier extends Notifier<HomeState> {
   /// GET /api/profile (for the avatar). The two are fetched concurrently but
   /// handled independently so a profile failure never blanks the dashboard.
   Future<void> _load() async {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.accessToken == null || auth.accessToken!.isEmpty) {
+      state = state.copyWith(isLoading: false);
+      return;
+    }
     final client = ref.read(apiClientProvider);
 
     // Best-effort: push the device location to the backend. Fire-and-forget so

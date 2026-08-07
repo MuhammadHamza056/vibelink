@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../models/memory_model.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class MemoriesState {
   const MemoriesState({
@@ -38,6 +40,11 @@ class MemoriesNotifier extends Notifier<MemoriesState> {
   /// Fetches the user's memories from GET /api/memories. The payload's `body`
   /// is a JSON array, which we map into [MemoryModel]s.
   Future<void> _load() async {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.accessToken == null || auth.accessToken!.isEmpty) {
+      state = state.copyWith(isLoading: false);
+      return;
+    }
     try {
       final res = await ref.read(apiClientProvider).get(ApiEndpoints.memories);
       final body = res['body'];
@@ -126,3 +133,67 @@ class MemoriesNotifier extends Notifier<MemoriesState> {
 
 final memoriesProvider =
     NotifierProvider<MemoriesNotifier, MemoriesState>(MemoriesNotifier.new);
+
+/// Form state for adding a new memory (picked image, selected tags, submitting indicator).
+class AddMemoryFormState {
+  const AddMemoryFormState({
+    this.pickedImagePath,
+    this.selectedTags = const {},
+    this.isSubmitting = false,
+  });
+
+  final String? pickedImagePath;
+  final Set<String> selectedTags;
+  final bool isSubmitting;
+
+  AddMemoryFormState copyWith({
+    String? pickedImagePath,
+    Set<String>? selectedTags,
+    bool? isSubmitting,
+    bool clearImage = false,
+  }) {
+    return AddMemoryFormState(
+      pickedImagePath: clearImage ? null : (pickedImagePath ?? this.pickedImagePath),
+      selectedTags: selectedTags ?? this.selectedTags,
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+    );
+  }
+}
+
+class AddMemoryFormNotifier extends AutoDisposeNotifier<AddMemoryFormState> {
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  AddMemoryFormState build() => const AddMemoryFormState();
+
+  Future<void> pickImage(ImageSource source) async {
+    try {
+      final file = await _picker.pickImage(
+        source: source,
+        maxWidth: 1280,
+        imageQuality: 85,
+      );
+      if (file == null) return;
+      state = state.copyWith(pickedImagePath: file.path);
+    } catch (_) {}
+  }
+
+  void removeImage() {
+    state = state.copyWith(clearImage: true);
+  }
+
+  void toggleTag(String tag) {
+    final next = {...state.selectedTags};
+    next.contains(tag) ? next.remove(tag) : next.add(tag);
+    state = state.copyWith(selectedTags: next);
+  }
+
+  void setSubmitting(bool value) {
+    state = state.copyWith(isSubmitting: value);
+  }
+}
+
+final addMemoryFormProvider =
+    AutoDisposeNotifierProvider<AddMemoryFormNotifier, AddMemoryFormState>(
+  AddMemoryFormNotifier.new,
+);
