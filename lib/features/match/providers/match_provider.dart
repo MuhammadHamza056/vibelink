@@ -16,6 +16,7 @@ class MatchCandidate {
     required this.vibeTags,
     required this.sharedTags,
     required this.vibeScore,
+    this.safetyPulseEnabled = false,
   });
 
   final String id;
@@ -23,12 +24,9 @@ class MatchCandidate {
   final String avatarUrl;
   final int level;
   final List<String> vibeTags;
-
-  /// Tags this match shares with the signed-in user (a subset of [vibeTags]).
   final List<String> sharedTags;
-
-  /// Compatibility score in the 0–1 range.
   final double vibeScore;
+  final bool safetyPulseEnabled;
 
   factory MatchCandidate.fromJson(Map<String, dynamic> json) {
     final user = (json['user'] as Map<String, dynamic>?) ?? const {};
@@ -40,6 +38,7 @@ class MatchCandidate {
       vibeTags: (user['vibeTags'] as List?)?.cast<String>() ?? const [],
       sharedTags: (json['sharedTags'] as List?)?.cast<String>() ?? const [],
       vibeScore: ((json['vibeScore'] ?? 0) as num).toDouble(),
+      safetyPulseEnabled: (user['safetyPulseEnabled'] ?? false) as bool,
     );
   }
 
@@ -51,6 +50,7 @@ class MatchCandidate {
         vibeTags: ['Musical', 'Creative', 'Traveler'],
         sharedTags: ['Creative'],
         vibeScore: 0.82,
+        safetyPulseEnabled: true,
       );
 }
 

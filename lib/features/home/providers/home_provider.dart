@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
@@ -41,8 +42,13 @@ class HomeState {
 }
 
 class HomeNotifier extends Notifier<HomeState> {
+  Timer? _locationTimer;
+
   @override
   HomeState build() {
+    ref.onDispose(() {
+      _locationTimer?.cancel();
+    });
     _load();
     return const HomeState();
   }
@@ -64,14 +70,19 @@ class HomeNotifier extends Notifier<HomeState> {
     final home = results[0] as HomeModel?;
     final profile = results[1] as UserModel?;
 
+    final isSafetyActive = profile?.safetyPulseEnabled ?? false;
+
     state = state.copyWith(
       home: home,
       profile: profile,
       isLoading: false,
-      // Reflect the user's saved burnout-guard preference.
-      safetyPulseActive: home?.burnoutEnabled ?? false,
+      safetyPulseActive: isSafetyActive,
       error: home == null ? 'Could not load your home feed.' : null,
     );
+
+    if (isSafetyActive) {
+      _startPeriodicLocationSync();
+    }
   }
 
   /// Reads the current device location and PUTs it to /api/profile/location.
@@ -90,16 +101,25 @@ class HomeNotifier extends Notifier<HomeState> {
     }
   }
 
+  void _startPeriodicLocationSync() {
+    _locationTimer?.cancel();
+    _locationTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      final client = ref.read(apiClientProvider);
+      _syncLocation(client);
+    });
+  }
+
+  void _stopPeriodicLocationSync() {
+    _locationTimer?.cancel();
+    _locationTimer = null;
+  }
+
   Future<HomeModel?> _fetchHome(ApiClient client) async {
     try {
       final res = await client.get(ApiEndpoints.home);
       final body = res['body'];
       if (body is! Map<String, dynamic>) return null;
       final home = HomeModel.fromJson(body);
-      // Randomize which challenge is featured as the "Challenge of the Day".
-      // Shuffling once on load keeps it stable across rebuilds, while a
-      // pull-to-refresh picks a fresh one. dailyChallenge reads .first and the
-      // "Suggested for You" row skips that same first item, so they stay in sync.
       home.suggestedChallenges.shuffle();
       return home;
     } catch (_) {
@@ -122,9 +142,57 @@ class HomeNotifier extends Notifier<HomeState> {
     return _load();
   }
 
-  void toggleSafetyPulse() {
-    state = state.copyWith(safetyPulseActive: !state.safetyPulseActive);
+  /// Toggles Safety Pulse ON/OFF, syncs location immediately when active,
+  /// and updates user preference via PATCH /api/profile.
+  Future<bool> toggleSafetyPulse() async {
+    final nextState = !state.safetyPulseActive;
+    state = state.copyWith(safetyPulseActive: nextState);
+
+    final client = ref.read(apiClientProvider);
+
+    if (nextState) {
+      _syncLocation(client);
+      _startPeriodicLocationSync();
+    } else {
+      _stopPeriodicLocationSync();
+    }
+
+    try {
+      await client.patch(
+        ApiEndpoints.profile,
+        body: {'safetyPulseEnabled': nextState},
+      );
+      if (state.profile != null) {
+        state = state.copyWith(
+          profile: state.profile!.copyWith(safetyPulseEnabled: nextState),
+        );
+      }
+      return true;
+    } catch (_) {
+      // Keep UI updated for smooth UX
+      return false;
+    }
+  }
+
+  /// Triggers emergency SOS alert (POST /api/notifications/emergency)
+  Future<bool> triggerEmergencySOS() async {
+    final client = ref.read(apiClientProvider);
+    final pos = await ref.read(locationServiceProvider).currentPosition();
+    try {
+      final res = await client.post(
+        ApiEndpoints.notificationEmergency,
+        body: {
+          if (pos != null) 'lat': pos.latitude,
+          if (pos != null) 'lng': pos.longitude,
+          'message': 'Emergency SOS alert triggered from Safety Pulse!',
+        },
+      );
+      return res['statusCode'] == 200 || res['statusCode'] == 201;
+    } catch (_) {
+      return false;
+    }
   }
 }
 
 final homeProvider = NotifierProvider<HomeNotifier, HomeState>(HomeNotifier.new);
+

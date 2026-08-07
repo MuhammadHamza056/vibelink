@@ -245,9 +245,46 @@ class _StatusSection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              state.candidate?.username ?? 'Anonymous',
-              style: AppTextStyles.headlineMedium,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  state.candidate?.username ?? 'Anonymous',
+                  style: AppTextStyles.headlineMedium,
+                ),
+                if (state.candidate?.safetyPulseEnabled == true) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.green.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.green.withValues(alpha: 0.5)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.green.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.shield_rounded, color: AppColors.green, size: 14),
+                        SizedBox(width: 4),
+                        Text(
+                          'Safety Verified',
+                          style: TextStyle(
+                            color: AppColors.green,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 4),
             if (state.candidate != null)

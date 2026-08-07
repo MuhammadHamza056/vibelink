@@ -314,13 +314,17 @@ class _ChallengeCta extends ConsumerWidget {
       challengeProvider.select((s) => s.completableTimeFor(id)),
     );
 
+    final hasOtherActive = ref.watch(
+      challengeProvider.select((s) => s.hasOtherActiveChallenge(id)),
+    );
+
     final remaining = completableAt == null
         ? Duration.zero
         : completableAt.difference(DateTime.now());
     final inProgress = isStarted && remaining > Duration.zero;
 
     final label = !isStarted
-        ? 'Start Challenge 🚀'
+        ? (hasOtherActive ? 'Another Challenge Active 🔒' : 'Start Challenge 🚀')
         : inProgress
             ? 'Complete in ${_formatRemaining(remaining)} ⏳'
             : 'Complete Challenge ✅';
@@ -329,14 +333,14 @@ class _ChallengeCta extends ConsumerWidget {
       label: label,
       gradient: challenge.gradient,
       isLoading: isStarting || isCompleting,
-      // Disabled while the timer is running.
+      // Disabled while countdown is active for this challenge.
       onTap: inProgress ? null : () => _onTap(context, ref, isStarted),
       width: double.infinity,
       height: 58,
     );
 
-    // Dim the button while it's a disabled countdown to signal it's locked.
-    return Opacity(opacity: inProgress ? 0.6 : 1, child: button);
+    // Dim the button while countdown is active or another challenge is active.
+    return Opacity(opacity: (inProgress || (hasOtherActive && !isStarted)) ? 0.6 : 1, child: button);
   }
 }
 

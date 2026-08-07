@@ -26,6 +26,7 @@ class HomeModel {
     required this.burnoutEnabled,
     required this.daysSinceActive,
     this.burnoutNudge,
+    this.safetyPulseEnabled = false,
   });
 
   // user
@@ -51,10 +52,11 @@ class HomeModel {
   final List<MemoryModel> recentMemories;
   final List<String> categories;
 
-  // burnout guard
+  // burnout guard & safety pulse
   final bool burnoutEnabled;
   final int daysSinceActive;
   final String? burnoutNudge;
+  final bool safetyPulseEnabled;
 
   /// The first suggested challenge, featured as the "Challenge of the Day".
   ChallengeModel? get dailyChallenge =>
@@ -99,6 +101,7 @@ class HomeModel {
       burnoutEnabled: (burnout['enabled'] ?? false) as bool,
       daysSinceActive: (burnout['daysSinceActive'] ?? 0) as int,
       burnoutNudge: burnout['nudge'] as String?,
+      safetyPulseEnabled: (user['safetyPulseEnabled'] ?? false) as bool,
     );
   }
 }

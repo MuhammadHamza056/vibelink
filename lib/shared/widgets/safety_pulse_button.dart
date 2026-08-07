@@ -8,10 +8,12 @@ class SafetyPulseButton extends StatefulWidget {
     super.key,
     required this.isActive,
     required this.onToggle,
+    this.onLongPress,
   });
 
   final bool isActive;
   final VoidCallback onToggle;
+  final VoidCallback? onLongPress;
 
   @override
   State<SafetyPulseButton> createState() => _SafetyPulseButtonState();
@@ -42,6 +44,7 @@ class _SafetyPulseButtonState extends State<SafetyPulseButton>
 
     return GestureDetector(
       onTap: widget.onToggle,
+      onLongPress: widget.onLongPress,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -99,15 +102,18 @@ class SafetyPulseBanner extends StatelessWidget {
     super.key,
     required this.isActive,
     required this.onToggle,
+    this.onLongPressSOS,
   });
 
   final bool isActive;
   final VoidCallback onToggle;
+  final VoidCallback? onLongPressSOS;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onToggle,
+      onLongPress: onLongPressSOS,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -126,21 +132,48 @@ class SafetyPulseBanner extends StatelessWidget {
         ),
         child: Row(
           children: [
-            SafetyPulseButton(isActive: isActive, onToggle: onToggle),
+            SafetyPulseButton(
+              isActive: isActive,
+              onToggle: onToggle,
+              onLongPress: onLongPressSOS,
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    isActive ? 'Safety Pulse: ON' : 'Safety Pulse: OFF',
-                    style: AppTextStyles.titleMedium.copyWith(
-                      color: isActive ? AppColors.green : AppColors.error,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isActive ? 'Safety Pulse: ON' : 'Safety Pulse: OFF',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          color: isActive ? AppColors.green : AppColors.error,
+                        ),
+                      ),
+                      if (isActive)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
+                          ),
+                          child: Text(
+                            'Hold for SOS',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.error,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     isActive
-                        ? 'Trusted contacts can see you\'re active'
+                        ? 'Trusted contacts notified • Hold shield 2s for Emergency SOS'
                         : 'Tap to activate peace of mind mode',
                     style: AppTextStyles.bodySmall,
                   ),
@@ -153,3 +186,4 @@ class SafetyPulseBanner extends StatelessWidget {
     ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0);
   }
 }
+

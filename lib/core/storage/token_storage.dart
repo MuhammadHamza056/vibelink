@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -12,6 +13,7 @@ class TokenStorage {
   static const String _kAccess = 'access_token';
   static const String _kRefresh = 'refresh_token';
   static const String _kOnboarding = 'has_seen_onboarding';
+  static const String _kActiveChallenges = 'active_challenges';
 
   Future<void> saveTokens({
     String? accessToken,
@@ -38,11 +40,34 @@ class TokenStorage {
   Future<bool> readOnboardingSeen() async =>
       (await _storage.read(key: _kOnboarding)) == 'true';
 
+  /// Saves active challenge completion times map (challengeId -> DateTime ISO string).
+  Future<void> saveActiveChallenges(Map<String, DateTime> completableAt) async {
+    try {
+      final map = completableAt.map((id, dt) => MapEntry(id, dt.toIso8601String()));
+      await _storage.write(key: _kActiveChallenges, value: jsonEncode(map));
+    } catch (_) {}
+  }
+
+  /// Reads active challenge completion times map.
+  Future<Map<String, DateTime>> readActiveChallenges() async {
+    try {
+      final str = await _storage.read(key: _kActiveChallenges);
+      if (str == null || str.isEmpty) return {};
+      final decoded = jsonDecode(str) as Map<String, dynamic>;
+      return decoded.map((id, val) {
+        return MapEntry(id, DateTime.parse(val.toString()));
+      });
+    } catch (_) {
+      return {};
+    }
+  }
+
   /// Clears the auth tokens only. Intentionally leaves the onboarding flag in
   /// place so logout returns the user to login, not onboarding.
   Future<void> clear() async {
     await _storage.delete(key: _kAccess);
     await _storage.delete(key: _kRefresh);
+    await _storage.delete(key: _kActiveChallenges);
   }
 }
 
@@ -59,3 +84,4 @@ final bootstrapTokensProvider =
 /// Whether onboarding has been completed, read from secure storage at app
 /// start. Overridden in `main()`; defaults to `false` (show onboarding).
 final bootstrapOnboardingSeenProvider = Provider<bool>((ref) => false);
+

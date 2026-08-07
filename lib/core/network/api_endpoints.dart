@@ -48,6 +48,7 @@ class ApiEndpoints {
 
   // ---- Notifications ----
   static const String notifications = '/api/notifications';
+  static const String notificationEmergency = '/api/notifications/emergency';
   static String notificationAccept(String id) =>
       '/api/notifications/$id/accept';
   static String notificationReject(String id) =>

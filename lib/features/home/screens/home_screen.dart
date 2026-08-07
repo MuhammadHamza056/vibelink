@@ -100,9 +100,121 @@ class HomeScreen extends ConsumerWidget {
                         // Safety Pulse
                         SafetyPulseBanner(
                           isActive: state.safetyPulseActive,
-                          onToggle: () => ref
-                              .read(homeProvider.notifier)
-                              .toggleSafetyPulse(),
+                          onToggle: () async {
+                            final notifier = ref.read(homeProvider.notifier);
+                            final wasActive = state.safetyPulseActive;
+                            await notifier.toggleSafetyPulse();
+                            if (!context.mounted) return;
+                            final nowActive = !wasActive;
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: nowActive
+                                    ? AppColors.green.withValues(alpha: 0.95)
+                                    : Colors.grey.shade800,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                content: Row(
+                                  children: [
+                                    Icon(
+                                      nowActive
+                                          ? Icons.shield_rounded
+                                          : Icons.shield_outlined,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        nowActive
+                                            ? 'Safety Pulse Activated — trusted contacts notified'
+                                            : 'Safety Pulse Deactivated',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                          onLongPressSOS: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: const Color(0xFF1E1E2C),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                title: const Row(
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 28),
+                                    SizedBox(width: 8),
+                                    Text('Emergency SOS Alert', style: TextStyle(color: Colors.white)),
+                                  ],
+                                ),
+                                content: const Text(
+                                  'Are you sure you want to broadcast an Emergency SOS alert with your live location to all trusted contacts?',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                                  ),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.error,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    icon: const Icon(Icons.emergency_rounded, size: 18),
+                                    label: const Text('SEND SOS NOW'),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (confirm == true && context.mounted) {
+                              final success = await ref
+                                  .read(homeProvider.notifier)
+                                  .triggerEmergencySOS();
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: AppColors.error,
+                                  behavior: SnackBarBehavior.floating,
+                                  duration: const Duration(seconds: 4),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.emergency_rounded, color: Colors.white),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          success
+                                              ? '🚨 Emergency SOS broadcasted with live location!'
+                                              : '⚠️ Could not send SOS alert. Check connection.',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+                          },
                         ),
                         const SizedBox(height: 24),
 
