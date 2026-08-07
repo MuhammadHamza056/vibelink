@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
@@ -187,8 +188,17 @@ class HomeNotifier extends Notifier<HomeState> {
           'message': 'Emergency SOS alert triggered from Safety Pulse!',
         },
       );
-      return res['statusCode'] == 200 || res['statusCode'] == 201;
-    } catch (_) {
+      debugPrint('🚨 [Emergency SOS API Response]: $res');
+      final isSuccess = res['success'] == true ||
+          res['statusCode'] == 200 ||
+          res['statusCode'] == 201 ||
+          (res['body'] is Map && res['body']['success'] == true);
+      return isSuccess;
+    } on ApiException catch (e) {
+      debugPrint('❌ [Emergency SOS API Error]: ${e.message} (status: ${e.statusCode})');
+      return false;
+    } catch (e) {
+      debugPrint('❌ [Emergency SOS API Error]: $e');
       return false;
     }
   }

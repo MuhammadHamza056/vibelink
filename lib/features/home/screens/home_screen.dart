@@ -17,6 +17,7 @@ import '../../../shared/widgets/safety_pulse_button.dart';
 import '../../../shared/widgets/streak_indicator.dart';
 import '../../../shared/widgets/vibe_card.dart';
 import '../../notifications/providers/notifications_provider.dart';
+import '../../challenges/providers/challenge_provider.dart';
 import '../providers/home_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -217,6 +218,9 @@ class HomeScreen extends ConsumerWidget {
                           },
                         ),
                         const SizedBox(height: 24),
+
+                        // Active Challenge Banner
+                        const _ActiveChallengeBanner(),
 
                         // Daily Challenge
                         if (home?.dailyChallenge != null) ...[
@@ -539,5 +543,170 @@ class _ShimmerBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(radius),
       ),
     );
+  }
+}
+
+final _activeChallengeTickerProvider = StreamProvider.autoDispose<int>(
+  (ref) => Stream<int>.periodic(const Duration(seconds: 1), (i) => i),
+);
+
+class _ActiveChallengeBanner extends ConsumerWidget {
+  const _ActiveChallengeBanner();
+
+  String _formatRemaining(Duration d) {
+    final m = d.inMinutes.toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(_activeChallengeTickerProvider);
+    final challengeState = ref.watch(challengeProvider);
+    final activeIds = challengeState.activeChallengeIds;
+
+    if (activeIds.isEmpty) return const SizedBox.shrink();
+
+    final activeId = activeIds.first;
+    final challenge = ref.watch(challengeByIdProvider(activeId));
+    final completableAt = challengeState.completableTimeFor(activeId);
+
+    final remaining = completableAt == null
+        ? Duration.zero
+        : completableAt.difference(DateTime.now());
+    final inProgress = remaining > Duration.zero;
+
+    final title = challenge?.title ?? 'Active Challenge';
+    final emoji = challenge?.emoji ?? '⚡';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: GestureDetector(
+        onTap: () => context.push('/challenge/$activeId'),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary.withValues(alpha: 0.25),
+                AppColors.cyan.withValues(alpha: 0.15),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.primaryLight.withValues(alpha: 0.5),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: AppColors.primaryGradient,
+                ),
+                child: Center(
+                  child: Text(
+                    emoji,
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryLight.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.bolt_rounded, size: 12, color: AppColors.gold),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    'IN PROGRESS',
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      color: AppColors.gold,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      title,
+                      style: AppTextStyles.titleMedium.copyWith(color: Colors.white),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: inProgress
+                      ? AppColors.cardBg
+                      : AppColors.green.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: inProgress
+                        ? AppColors.cardBorder
+                        : AppColors.green.withValues(alpha: 0.6),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      inProgress
+                          ? _formatRemaining(remaining)
+                          : 'Complete ✅',
+                      style: AppTextStyles.labelLarge.copyWith(
+                        color: inProgress ? AppColors.cyan : AppColors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: Colors.white70,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0);
   }
 }
