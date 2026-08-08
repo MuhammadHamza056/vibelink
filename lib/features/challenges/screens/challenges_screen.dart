@@ -8,6 +8,8 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../shared/widgets/challenge_card.dart';
 import '../providers/challenge_provider.dart';
 
+import '../widgets/completed_challenges_sheet.dart';
+
 class ChallengesScreen extends ConsumerWidget {
   const ChallengesScreen({super.key});
 
@@ -40,10 +42,35 @@ class ChallengesScreen extends ConsumerWidget {
                         ),
                         const Spacer(),
                         GestureDetector(
+                          onTap: () => CompletedChallengesSheet.show(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.cardBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.cardBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.emoji_events_rounded,
+                                    size: 16, color: AppColors.gold),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Completed',
+                                  style: AppTextStyles.labelSmall
+                                      .copyWith(color: AppColors.gold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
                           onTap: () => context.go(AppConstants.routeMatch),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
+                                horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: AppColors.cardBg,
                               borderRadius: BorderRadius.circular(10),
@@ -53,7 +80,7 @@ class ChallengesScreen extends ConsumerWidget {
                               children: [
                                 const Icon(Icons.map_rounded,
                                     size: 16, color: AppColors.cyan),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 5),
                                 Text('Nearby',
                                     style: AppTextStyles.labelSmall
                                         .copyWith(color: AppColors.cyan)),
@@ -171,6 +198,7 @@ class _FilterTabs extends StatelessWidget {
     (ChallengeFilter.today, 'Today'),
     (ChallengeFilter.thisWeek, 'This Week'),
     (ChallengeFilter.trending, '🔥 Trending'),
+    (ChallengeFilter.completed, '✅ Completed'),
   ];
 
   @override

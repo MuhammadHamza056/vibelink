@@ -74,6 +74,11 @@ class _LargeChallengeCard extends StatelessWidget {
                           label: '🔥 Trending',
                           bg: Colors.white.withValues(alpha: 0.2),
                         ),
+                      if (challenge.isCompleted)
+                        _Tag(
+                          label: '✅ Completed',
+                          bg: AppColors.green.withValues(alpha: 0.3),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -215,6 +220,15 @@ class _CompactChallengeCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (challenge.isCompleted) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '✅ Played / Completed',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.green,
+                          ),
+                        ),
+                      ],
                       if (challenge.isTrending) ...[
                         const SizedBox(height: 6),
                         Text(

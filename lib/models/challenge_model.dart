@@ -55,6 +55,8 @@ class ChallengeModel {
     this.isDaily = false,
     this.isShared = false,
     this.sharedWith = const [],
+    this.isCompleted = false,
+    this.inProgress = false,
   });
 
   final String id;
@@ -79,12 +81,17 @@ class ChallengeModel {
   /// Connections this challenge has been shared with.
   final List<SharedConnection> sharedWith;
 
-  /// Builds a challenge from the GET /api/challenges payload. The backend has
-  /// no participant counts, status or expiry, so those default; `vibeTags`
-  /// becomes [tags] and `isTrending` is derived from the XP reward so the
-  /// Trending filter stays meaningful.
+  /// Whether the logged in user completed this challenge.
+  final bool isCompleted;
+
+  /// Whether this challenge is currently active / in-progress.
+  final bool inProgress;
+
+  /// Builds a challenge from the GET /api/challenges payload.
   factory ChallengeModel.fromJson(Map<String, dynamic> json) {
     final xpReward = (json['xpReward'] ?? 0) as int;
+    final isComp = (json['isCompleted'] ?? false) as bool;
+    final inProg = (json['inProgress'] ?? false) as bool;
     return ChallengeModel(
       id: (json['id'] ?? json['_id'] ?? '').toString(),
       title: (json['title'] ?? '') as String,
@@ -93,7 +100,9 @@ class ChallengeModel {
       durationMinutes: (json['durationMinutes'] ?? 0) as int,
       category: _categoryFrom(json['category'] as String?),
       difficulty: _difficultyFrom(json['difficulty'] as String?),
-      status: ChallengeStatus.available,
+      status: inProg
+          ? ChallengeStatus.active
+          : (isComp ? ChallengeStatus.completed : ChallengeStatus.available),
       participants: 0,
       maxParticipants: 0,
       xpReward: xpReward,
@@ -108,6 +117,52 @@ class ChallengeModel {
               .map(SharedConnection.fromJson)
               .toList() ??
           const [],
+      isCompleted: isComp,
+      inProgress: inProg,
+    );
+  }
+
+  ChallengeModel copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? emoji,
+    int? durationMinutes,
+    ChallengeCategory? category,
+    ChallengeDifficulty? difficulty,
+    ChallengeStatus? status,
+    int? participants,
+    int? maxParticipants,
+    int? xpReward,
+    List<String>? tags,
+    DateTime? expiresAt,
+    bool? isTrending,
+    bool? isDaily,
+    bool? isShared,
+    List<SharedConnection>? sharedWith,
+    bool? isCompleted,
+    bool? inProgress,
+  }) {
+    return ChallengeModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      emoji: emoji ?? this.emoji,
+      durationMinutes: durationMinutes ?? this.durationMinutes,
+      category: category ?? this.category,
+      difficulty: difficulty ?? this.difficulty,
+      status: status ?? this.status,
+      participants: participants ?? this.participants,
+      maxParticipants: maxParticipants ?? this.maxParticipants,
+      xpReward: xpReward ?? this.xpReward,
+      tags: tags ?? this.tags,
+      expiresAt: expiresAt ?? this.expiresAt,
+      isTrending: isTrending ?? this.isTrending,
+      isDaily: isDaily ?? this.isDaily,
+      isShared: isShared ?? this.isShared,
+      sharedWith: sharedWith ?? this.sharedWith,
+      isCompleted: isCompleted ?? this.isCompleted,
+      inProgress: inProgress ?? this.inProgress,
     );
   }
 

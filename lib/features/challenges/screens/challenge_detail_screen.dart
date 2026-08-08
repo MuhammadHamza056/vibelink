@@ -11,6 +11,8 @@ import '../../../core/utils/app_helpers.dart';
 import '../../../core/utils/toast_util.dart';
 import '../../../models/challenge_model.dart';
 import '../../../shared/widgets/gradient_button.dart';
+import '../../../shared/widgets/review_dialog.dart';
+import '../../review/providers/review_provider.dart';
 import '../providers/challenge_provider.dart';
 
 class ChallengeDetailScreen extends ConsumerWidget {
@@ -20,6 +22,7 @@ class ChallengeDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    Future.microtask(() => ref.read(challengeProvider.notifier).fetchChallengeById(id));
     final challenge = ref.watch(challengeByIdProvider(id));
 
     if (challenge == null) {
@@ -268,6 +271,13 @@ class _ChallengeCta extends ConsumerWidget {
         ToastUtil.success(
             context, '${challenge.emoji} Challenge completed! 🎉');
         Navigator.of(context).pop();
+
+        final completedCount =
+            ref.read(challengeProvider).completedChallenges.length;
+        final hasReviewed = ref.read(reviewProvider).hasReviewed;
+        if (completedCount == 1 && !hasReviewed) {
+          showReviewDialog(context);
+        }
       } else {
         ToastUtil.error(
           context,
@@ -324,7 +334,9 @@ class _ChallengeCta extends ConsumerWidget {
     final inProgress = isStarted && remaining > Duration.zero;
 
     final label = !isStarted
-        ? (hasOtherActive ? 'Another Challenge Active 🔒' : 'Start Challenge 🚀')
+        ? (challenge.isCompleted
+            ? 'Play Again 🔁'
+            : (hasOtherActive ? 'Another Challenge Active 🔒' : 'Start Challenge 🚀'))
         : inProgress
             ? 'Complete in ${_formatRemaining(remaining)} ⏳'
             : 'Complete Challenge ✅';

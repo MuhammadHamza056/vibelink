@@ -21,9 +21,13 @@ class TokenStorage {
   }) async {
     if (accessToken != null && accessToken.isNotEmpty) {
       await _storage.write(key: _kAccess, value: accessToken);
+    } else {
+      await _storage.delete(key: _kAccess);
     }
     if (refreshToken != null && refreshToken.isNotEmpty) {
       await _storage.write(key: _kRefresh, value: refreshToken);
+    } else {
+      await _storage.delete(key: _kRefresh);
     }
   }
 
@@ -43,7 +47,8 @@ class TokenStorage {
   /// Saves active challenge completion times map (challengeId -> DateTime ISO string).
   Future<void> saveActiveChallenges(Map<String, DateTime> completableAt) async {
     try {
-      final map = completableAt.map((id, dt) => MapEntry(id, dt.toIso8601String()));
+      final map =
+          completableAt.map((id, dt) => MapEntry(id, dt.toIso8601String()));
       await _storage.write(key: _kActiveChallenges, value: jsonEncode(map));
     } catch (_) {}
   }
@@ -69,6 +74,12 @@ class TokenStorage {
     await _storage.delete(key: _kRefresh);
     await _storage.delete(key: _kActiveChallenges);
   }
+
+  /// Completely purges all stored items from secure storage. Used on fresh app
+  /// installs to clean up leftover iOS Keychain entries from prior installations.
+  Future<void> clearAll() async {
+    await _storage.deleteAll();
+  }
 }
 
 final tokenStorageProvider = Provider<TokenStorage>((ref) => TokenStorage());
@@ -84,4 +95,3 @@ final bootstrapTokensProvider =
 /// Whether onboarding has been completed, read from secure storage at app
 /// start. Overridden in `main()`; defaults to `false` (show onboarding).
 final bootstrapOnboardingSeenProvider = Provider<bool>((ref) => false);
-

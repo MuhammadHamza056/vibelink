@@ -59,6 +59,12 @@ class ApiEndpoints {
 
   // ---- Challenges ----
   static const String challenges = '/api/challenges';
+  static const String challengesCompleted = '/api/challenges/completed';
+  static String challengeById(String id) => '/api/challenges/$id';
   static String challengeStart(String id) => '/api/challenges/$id/start';
   static String challengeComplete(String id) => '/api/challenges/$id/complete';
+
+  // ---- Reviews ----
+  static const String reviews = '/api/reviews';
+  static const String reviewsMine = '/api/reviews/mine';
 }

@@ -6,11 +6,12 @@ import '../../../models/challenge_model.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../home/providers/home_provider.dart';
 
-enum ChallengeFilter { today, thisWeek, trending }
+enum ChallengeFilter { today, thisWeek, trending, completed }
 
 class ChallengeState {
   const ChallengeState({
     this.challenges = const [],
+    this.completedChallenges = const [],
     this.filter = ChallengeFilter.today,
     this.isLoading = true,
     this.activeChallenge,
@@ -22,6 +23,7 @@ class ChallengeState {
   });
 
   final List<ChallengeModel> challenges;
+  final List<ChallengeModel> completedChallenges;
   final ChallengeFilter filter;
   final bool isLoading;
   final ChallengeModel? activeChallenge;
@@ -44,6 +46,9 @@ class ChallengeState {
         ChallengeFilter.today => challenges,
         ChallengeFilter.thisWeek => challenges.where((c) => c.xpReward >= 60).toList(),
         ChallengeFilter.trending => challenges.where((c) => c.isTrending).toList(),
+        ChallengeFilter.completed => completedChallenges.isNotEmpty
+            ? completedChallenges
+            : challenges.where((c) => c.isCompleted).toList(),
       };
 
   bool isStarted(String id) => activeChallengeIds.contains(id);
@@ -67,6 +72,7 @@ class ChallengeState {
 
   ChallengeState copyWith({
     List<ChallengeModel>? challenges,
+    List<ChallengeModel>? completedChallenges,
     ChallengeFilter? filter,
     bool? isLoading,
     ChallengeModel? activeChallenge,
@@ -78,6 +84,7 @@ class ChallengeState {
   }) {
     return ChallengeState(
       challenges: challenges ?? this.challenges,
+      completedChallenges: completedChallenges ?? this.completedChallenges,
       filter: filter ?? this.filter,
       isLoading: isLoading ?? this.isLoading,
       activeChallenge: activeChallenge ?? this.activeChallenge,
@@ -97,8 +104,7 @@ class ChallengeNotifier extends Notifier<ChallengeState> {
     return const ChallengeState();
   }
 
-  /// Fetches challenges from GET /api/challenges. The payload's `body` is a
-  /// JSON array, which we map into [ChallengeModel]s. Restores persisted active challenge timers.
+  /// Fetches challenges from GET /api/challenges and GET /api/challenges/completed.
   Future<void> _load() async {
     final auth = ref.read(authProvider);
     if (!auth.isAuthenticated || auth.accessToken == null || auth.accessToken!.isEmpty) {
@@ -107,17 +113,53 @@ class ChallengeNotifier extends Notifier<ChallengeState> {
     }
     try {
       final activeMap = await ref.read(tokenStorageProvider).readActiveChallenges();
-      final res = await ref.read(apiClientProvider).get(ApiEndpoints.challenges);
-      final body = res['body'];
-      final challenges = (body as List?)
-              ?.whereType<Map<String, dynamic>>()
-              .map(ChallengeModel.fromJson)
-              .toList() ??
-          const <ChallengeModel>[];
+      final client = ref.read(apiClientProvider);
+
+      List<ChallengeModel> challenges = const [];
+      List<ChallengeModel> completedChallenges = const [];
+
+      try {
+        final res = await client.get(ApiEndpoints.challenges);
+        final body = res['body'] ?? res;
+        final rawList = body is List
+            ? body
+            : (body is Map && body['challenges'] is List
+                ? body['challenges'] as List
+                : const []);
+        challenges = rawList
+            .whereType<Map<String, dynamic>>()
+            .map(ChallengeModel.fromJson)
+            .toList();
+      } catch (_) {}
+
+      try {
+        final resCompleted = await client.get(ApiEndpoints.challengesCompleted);
+        final bodyCompleted = resCompleted['body'] ?? resCompleted;
+        final rawCompleted = bodyCompleted is List
+            ? bodyCompleted
+            : (bodyCompleted is Map && bodyCompleted['challenges'] is List
+                ? bodyCompleted['challenges'] as List
+                : const []);
+        completedChallenges = rawCompleted
+            .whereType<Map<String, dynamic>>()
+            .map(ChallengeModel.fromJson)
+            .toList();
+      } catch (_) {}
+
+      final serverActiveIds = <String>{};
+      for (final c in challenges) {
+        if (c.inProgress) {
+          serverActiveIds.add(c.id);
+        }
+      }
+
+      final mergedActiveIds = {...activeMap.keys, ...serverActiveIds};
+
       state = state.copyWith(
         challenges: challenges,
+        completedChallenges: completedChallenges,
         isLoading: false,
-        activeChallengeIds: activeMap.keys.toSet(),
+        activeChallengeIds: mergedActiveIds,
         completableAt: activeMap,
       );
     } on ApiException catch (e) {
@@ -149,10 +191,38 @@ class ChallengeNotifier extends Notifier<ChallengeState> {
     state = state.copyWith(filter: filter);
   }
 
-  /// Starts a challenge via POST /api/challenges/{id}/start. On success the id
-  /// is recorded in [ChallengeState.activeChallengeIds] so the UI can flip the
-  /// CTA to "Complete". Returns `true` on success, `false` otherwise (with the
-  /// reason left in [ChallengeState.error]).
+  /// Fetches a single challenge by ID from GET /api/challenges/:id
+  Future<ChallengeModel?> fetchChallengeById(String id) async {
+    try {
+      final res = await ref.read(apiClientProvider).get(ApiEndpoints.challengeById(id));
+      final data = res['body'] ?? res;
+      if (data is Map<String, dynamic>) {
+        final model = ChallengeModel.fromJson(data);
+        _updateChallengeInState(model);
+        return model;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  void _updateChallengeInState(ChallengeModel model) {
+    final updatedList = state.challenges.map((c) => c.id == model.id ? model : c).toList();
+    if (!updatedList.any((c) => c.id == model.id)) {
+      updatedList.add(model);
+    }
+
+    final updatedCompleted = [...state.completedChallenges];
+    if (model.isCompleted && !updatedCompleted.any((c) => c.id == model.id)) {
+      updatedCompleted.add(model);
+    }
+
+    state = state.copyWith(
+      challenges: updatedList,
+      completedChallenges: updatedCompleted,
+    );
+  }
+
+  /// Starts or Re-plays a challenge via POST /api/challenges/{id}/start.
   Future<bool> startChallenge(String id, {Duration duration = Duration.zero}) async {
     if (state.hasOtherActiveChallenge(id)) {
       state = state.copyWith(
@@ -163,21 +233,36 @@ class ChallengeNotifier extends Notifier<ChallengeState> {
     state = state.copyWith(startingId: id);
     try {
       try {
-        await ref.read(apiClientProvider).post(ApiEndpoints.challengeStart(id));
+        final res = await ref.read(apiClientProvider).post(ApiEndpoints.challengeStart(id));
+        final challengeData = res['challenge'] ?? (res['body'] is Map ? res['body']['challenge'] : null);
+        if (challengeData is Map<String, dynamic>) {
+          final updated = ChallengeModel.fromJson(challengeData);
+          _updateChallengeInState(updated);
+        }
       } on ApiException catch (e) {
         final msg = e.message.toLowerCase();
         if (msg.contains('already in progress') || msg.contains('already started')) {
-          // Challenge was already started on the server; treat as active locally.
+          // Challenge was already started on server
         } else {
           rethrow;
         }
       }
+
       final updatedCompletableAt = {
         ...state.completableAt,
         id: DateTime.now().add(duration),
       };
       final updatedIds = {...state.activeChallengeIds, id};
+
+      final updatedChallenges = state.challenges.map((c) {
+        if (c.id == id) {
+          return c.copyWith(inProgress: true, status: ChallengeStatus.active);
+        }
+        return c;
+      }).toList();
+
       state = state.copyWith(
+        challenges: updatedChallenges,
         activeChallengeIds: updatedIds,
         completableAt: updatedCompletableAt,
       );
@@ -192,26 +277,51 @@ class ChallengeNotifier extends Notifier<ChallengeState> {
     }
   }
 
-  /// Completes a started challenge via POST /api/challenges/{id}/complete. On
-  /// success the id is removed from [ChallengeState.activeChallengeIds].
-  /// Returns `true` on success, `false` otherwise (reason in
-  /// [ChallengeState.error]).
+  /// Completes a started challenge via POST /api/challenges/{id}/complete.
   Future<bool> completeChallenge(String id) async {
     state = state.copyWith(completingId: id);
     try {
       try {
-        await ref.read(apiClientProvider).post(ApiEndpoints.challengeComplete(id));
+        final res = await ref.read(apiClientProvider).post(ApiEndpoints.challengeComplete(id));
+        final challengeData = res['challenge'] ?? (res['body'] is Map ? res['body']['challenge'] : null);
+        if (challengeData is Map<String, dynamic>) {
+          final updated = ChallengeModel.fromJson(challengeData);
+          _updateChallengeInState(updated);
+        }
       } on ApiException catch (e) {
         final msg = e.message.toLowerCase();
         if (msg.contains('already completed') || msg.contains('not in progress') || msg.contains('not started')) {
-          // Already completed on server; clean up local active state.
+          // Already completed on server
         } else {
           rethrow;
         }
       }
+
       final updatedIds = state.activeChallengeIds.where((c) => c != id).toSet();
       final updatedCompletableAt = {...state.completableAt}..remove(id);
+
+      final updatedChallenges = state.challenges.map((c) {
+        if (c.id == id) {
+          return c.copyWith(
+            isCompleted: true,
+            inProgress: false,
+            status: ChallengeStatus.completed,
+          );
+        }
+        return c;
+      }).toList();
+
+      final target = state.challenges.firstWhere((c) => c.id == id, orElse: () => ChallengeModel(
+        id: id, title: '', description: '', emoji: '', durationMinutes: 0, category: ChallengeCategory.social, difficulty: ChallengeDifficulty.easy, status: ChallengeStatus.completed, participants: 0, maxParticipants: 0, xpReward: 0, tags: const [], expiresAt: DateTime.now(), isCompleted: true,
+      ));
+      final updatedCompleted = [...state.completedChallenges];
+      if (!updatedCompleted.any((c) => c.id == id)) {
+        updatedCompleted.add(target.copyWith(isCompleted: true, inProgress: false, status: ChallengeStatus.completed));
+      }
+
       state = state.copyWith(
+        challenges: updatedChallenges,
+        completedChallenges: updatedCompleted,
         activeChallengeIds: updatedIds,
         completableAt: updatedCompletableAt,
       );
