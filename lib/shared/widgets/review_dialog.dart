@@ -7,6 +7,9 @@ import '../../core/utils/toast_util.dart';
 import '../../features/review/providers/review_provider.dart';
 import 'gradient_button.dart';
 
+final reviewRatingProvider =
+    StateProvider.autoDispose<int>((ref) => 5);
+
 /// Shows an App Review Dialog and requests native store review.
 Future<void> showReviewDialog(BuildContext context, {bool isDismissible = false}) async {
   final inAppReview = InAppReview.instance;
@@ -35,7 +38,6 @@ class _ReviewDialogWidget extends ConsumerStatefulWidget {
 }
 
 class _ReviewDialogWidgetState extends ConsumerState<_ReviewDialogWidget> {
-  int _rating = 5;
   final _commentController = TextEditingController();
 
   @override
@@ -48,9 +50,10 @@ class _ReviewDialogWidgetState extends ConsumerState<_ReviewDialogWidget> {
     final commentText = _commentController.text.trim();
     final platform = Theme.of(context).platform;
     final deviceInfo = '${platform.name.toUpperCase()} Device';
+    final rating = ref.read(reviewRatingProvider);
 
     final ok = await ref.read(reviewProvider.notifier).submitReview(
-          rating: _rating,
+          rating: rating,
           comment: commentText.isEmpty
               ? 'Love the app! Vibe challenges are awesome.'
               : commentText,
@@ -72,6 +75,7 @@ class _ReviewDialogWidgetState extends ConsumerState<_ReviewDialogWidget> {
   @override
   Widget build(BuildContext context) {
     final isSubmitting = ref.watch(reviewProvider.select((s) => s.isSubmitting));
+    final rating = ref.watch(reviewRatingProvider);
 
     return PopScope(
       canPop: widget.isDismissible,
@@ -120,7 +124,7 @@ class _ReviewDialogWidgetState extends ConsumerState<_ReviewDialogWidget> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(5, (index) {
                   final starIndex = index + 1;
-                  final isFilled = starIndex <= _rating;
+                  final isFilled = starIndex <= rating;
                   return IconButton(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     constraints: const BoxConstraints(),
@@ -130,9 +134,7 @@ class _ReviewDialogWidgetState extends ConsumerState<_ReviewDialogWidget> {
                       size: 36,
                     ),
                     onPressed: () {
-                      setState(() {
-                        _rating = starIndex;
-                      });
+                      ref.read(reviewRatingProvider.notifier).state = starIndex;
                     },
                   );
                 }),

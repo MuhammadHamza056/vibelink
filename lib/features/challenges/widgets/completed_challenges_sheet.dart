@@ -10,7 +10,10 @@ import '../providers/challenge_provider.dart';
 
 import '../../../shared/widgets/review_dialog.dart';
 
-class CompletedChallengesSheet extends ConsumerStatefulWidget {
+final completedSearchQueryProvider =
+    StateProvider.autoDispose<String>((ref) => '');
+
+class CompletedChallengesSheet extends ConsumerWidget {
   const CompletedChallengesSheet({super.key});
 
   static Future<void> show(BuildContext context) {
@@ -23,29 +26,14 @@ class CompletedChallengesSheet extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<CompletedChallengesSheet> createState() =>
-      _CompletedChallengesSheetState();
-}
-
-class _CompletedChallengesSheetState
-    extends ConsumerState<CompletedChallengesSheet> {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(challengeProvider);
     final completedList = state.completedChallenges;
+    final searchQuery = ref.watch(completedSearchQueryProvider);
 
     final filteredList = completedList.where((c) {
-      if (_searchQuery.isEmpty) return true;
-      final q = _searchQuery.toLowerCase();
+      if (searchQuery.isEmpty) return true;
+      final q = searchQuery.toLowerCase();
       return c.title.toLowerCase().contains(q) ||
           c.description.toLowerCase().contains(q) ||
           c.tags.any((t) => t.toLowerCase().contains(q));
@@ -259,8 +247,8 @@ class _CompletedChallengesSheetState
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: TextField(
-                controller: _searchController,
-                onChanged: (val) => setState(() => _searchQuery = val),
+                onChanged: (val) =>
+                    ref.read(completedSearchQueryProvider.notifier).state = val,
                 style: AppTextStyles.bodyMedium
                     .copyWith(color: AppColors.textPrimary),
                 decoration: InputDecoration(
@@ -272,13 +260,14 @@ class _CompletedChallengesSheetState
                     color: AppColors.textSecondary,
                     size: 20,
                   ),
-                  suffixIcon: _searchQuery.isNotEmpty
+                  suffixIcon: searchQuery.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear_rounded,
                               size: 18, color: AppColors.textSecondary),
                           onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
+                            ref
+                                .read(completedSearchQueryProvider.notifier)
+                                .state = '';
                           },
                         )
                       : null,

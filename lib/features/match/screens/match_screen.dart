@@ -256,11 +256,13 @@ class _StatusSection extends StatelessWidget {
                 if (state.candidate?.safetyPulseEnabled == true) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppColors.green.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.green.withValues(alpha: 0.5)),
+                      border: Border.all(
+                          color: AppColors.green.withValues(alpha: 0.5)),
                       boxShadow: [
                         BoxShadow(
                           color: AppColors.green.withValues(alpha: 0.3),
@@ -271,7 +273,8 @@ class _StatusSection extends StatelessWidget {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.shield_rounded, color: AppColors.green, size: 14),
+                        Icon(Icons.shield_rounded,
+                            color: AppColors.green, size: 14),
                         SizedBox(width: 4),
                         Text(
                           'Safety Verified',
@@ -304,7 +307,8 @@ class _StatusSection extends StatelessWidget {
                   Text(
                     '${(state.candidate!.vibeScore * 100).toInt()}%',
                     style: AppTextStyles.titleMedium.copyWith(
-                      color: AppHelpers.vibeMatchColor(state.candidate!.vibeScore),
+                      color:
+                          AppHelpers.vibeMatchColor(state.candidate!.vibeScore),
                     ),
                   ),
                 ],
@@ -346,7 +350,9 @@ class _StatusSection extends StatelessWidget {
             ),
       MatchStatus.connected => Column(
           children: [
-            Text('Connected! 🤝', style: AppTextStyles.headlineSmall.copyWith(color: AppColors.green)),
+            Text('Connected! 🤝',
+                style: AppTextStyles.headlineSmall
+                    .copyWith(color: AppColors.green)),
             const SizedBox(height: 8),
             Text('You\'re now vibing with ${state.candidate?.username}',
                 style: AppTextStyles.bodyMedium, textAlign: TextAlign.center),
@@ -462,7 +468,8 @@ class _ActionButtons extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.location_on_rounded, color: AppColors.cyan, size: 28),
+            const Icon(Icons.location_on_rounded,
+                color: AppColors.cyan, size: 28),
             const SizedBox(width: 10),
             Text('Location Needed 📍', style: AppTextStyles.headlineSmall),
           ],
@@ -476,7 +483,8 @@ class _ActionButtons extends StatelessWidget {
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(
               'Cancel',
-              style: AppTextStyles.labelLarge.copyWith(color: AppColors.textSecondary),
+              style: AppTextStyles.labelLarge
+                  .copyWith(color: AppColors.textSecondary),
             ),
           ),
           GradientButton(
@@ -505,7 +513,11 @@ class _MatchStats extends StatelessWidget {
         ...[
           ('🔮', 'Anonymous', 'Your identity stays hidden until you connect'),
           ('🎯', 'Vibe-based', 'Matched by energy, interests and location'),
-          ('🛡️', 'Safe first', 'Safety Pulse keeps trusted people in the loop'),
+          (
+            '🛡️',
+            'Safe first',
+            'Safety Pulse keeps trusted people in the loop'
+          ),
         ].map((e) {
           final (emoji, title, desc) = e;
           return Padding(

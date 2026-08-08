@@ -32,8 +32,10 @@ class LocationService {
 
   Future<bool> openAppSettings() => Geolocator.openAppSettings();
   Future<bool> openLocationSettings() => Geolocator.openLocationSettings();
-  Future<bool> isLocationServiceEnabled() => Geolocator.isLocationServiceEnabled();
+  Future<bool> isLocationServiceEnabled() =>
+      Geolocator.isLocationServiceEnabled();
   Future<LocationPermission> checkPermission() => Geolocator.checkPermission();
+  Future<LocationPermission> requestPermission() => Geolocator.requestPermission();
 }
 
 final locationServiceProvider =
