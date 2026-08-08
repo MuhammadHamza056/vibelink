@@ -41,7 +41,7 @@ class ConnectionsState {
 class ConnectionsNotifier extends Notifier<ConnectionsState> {
   @override
   ConnectionsState build() {
-    _load();
+    Future.microtask(() => _load());
     return const ConnectionsState();
   }
 

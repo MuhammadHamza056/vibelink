@@ -51,7 +51,7 @@ class HomeNotifier extends Notifier<HomeState> {
     ref.onDispose(() {
       _locationTimer?.cancel();
     });
-    _load();
+    Future.microtask(() => _load());
     return const HomeState();
   }
 

@@ -6,9 +6,8 @@ import 'package:geolocator/geolocator.dart';
 class LocationService {
   const LocationService();
 
-  /// Returns the device's current position, or null when location services are
-  /// off or permission is denied. Never throws for the common denial paths —
-  /// callers can treat null as "no location available".
+  /// Returns the device's current position. Prompts for system permission dialog
+  /// if not yet granted.
   Future<Position?> currentPosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) return null;
 
@@ -24,11 +23,17 @@ class LocationService {
     try {
       return await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
       );
     } catch (_) {
       return null;
     }
   }
+
+  Future<bool> openAppSettings() => Geolocator.openAppSettings();
+  Future<bool> openLocationSettings() => Geolocator.openLocationSettings();
+  Future<bool> isLocationServiceEnabled() => Geolocator.isLocationServiceEnabled();
+  Future<LocationPermission> checkPermission() => Geolocator.checkPermission();
 }
 
 final locationServiceProvider =

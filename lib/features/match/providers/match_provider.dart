@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/services/location_service.dart';
 
 enum MatchStatus { searching, found, connected, skipped }
 
@@ -120,6 +121,26 @@ class MatchNotifier extends Notifier<MatchState> {
       error: null,
     );
     try {
+      final pos = await ref.read(locationServiceProvider).currentPosition();
+      if (pos == null) {
+        state = state.copyWith(
+          status: MatchStatus.searching,
+          isLoading: false,
+          error: 'Location permission is required to find nearby matches. Please grant location access.',
+        );
+        return;
+      }
+
+      // Sync device location to the backend first
+      try {
+        await ref.read(apiClientProvider).put(
+          ApiEndpoints.profileLocation,
+          body: {'lat': pos.latitude, 'lng': pos.longitude},
+        );
+      } catch (_) {
+        // Continue search if location update fails non-fatally
+      }
+
       final res = await ref.read(apiClientProvider).get(
         ApiEndpoints.matchNearby,
         query: {'radius': _radius, 'limit': _limit},

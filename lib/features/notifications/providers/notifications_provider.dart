@@ -52,7 +52,7 @@ class NotificationsState {
 class NotificationsNotifier extends Notifier<NotificationsState> {
   @override
   NotificationsState build() {
-    _load();
+    Future.microtask(() => _load());
     return const NotificationsState();
   }
 

@@ -7,6 +7,7 @@ import '../../../core/utils/app_helpers.dart';
 import '../../../core/utils/toast_util.dart';
 import '../../../shared/widgets/badge_chip.dart';
 import '../../../shared/widgets/gradient_button.dart';
+import '../../../core/services/location_service.dart';
 import '../providers/match_provider.dart';
 
 class MatchScreen extends ConsumerStatefulWidget {
@@ -385,7 +386,14 @@ class _ActionButtons extends StatelessWidget {
             gradient: AppColors.cyanPurpleGradient,
             icon: Icons.radar_rounded,
             isLoading: state.isLoading,
-            onTap: notifier.startSearch,
+            onTap: () async {
+              await notifier.startSearch();
+              if (!context.mounted) return;
+              final err = ref.read(matchProvider).error;
+              if (err != null && err.contains('Location permission')) {
+                _showLocationPermissionDialog(context, ref);
+              }
+            },
           ),
         ),
       MatchStatus.found => Row(
@@ -444,6 +452,45 @@ class _ActionButtons extends StatelessWidget {
           width: double.infinity,
         ),
     };
+  }
+
+  void _showLocationPermissionDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.location_on_rounded, color: AppColors.cyan, size: 28),
+            const SizedBox(width: 10),
+            Text('Location Needed 📍', style: AppTextStyles.headlineSmall),
+          ],
+        ),
+        content: Text(
+          'Location permission was previously denied. Please enable location access in app settings to discover nearby matches.',
+          style: AppTextStyles.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Cancel',
+              style: AppTextStyles.labelLarge.copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+          GradientButton(
+            label: 'Open Settings',
+            gradient: AppColors.cyanPurpleGradient,
+            height: 40,
+            onTap: () {
+              Navigator.of(ctx).pop();
+              ref.read(locationServiceProvider).openAppSettings();
+            },
+          ),
+        ],
+      ),
+    );
   }
 }
 

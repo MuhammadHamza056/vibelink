@@ -33,7 +33,7 @@ class MemoriesState {
 class MemoriesNotifier extends Notifier<MemoriesState> {
   @override
   MemoriesState build() {
-    _load();
+    Future.microtask(() => _load());
     return const MemoriesState();
   }
 

@@ -95,8 +95,32 @@ class AuthNotifier extends Notifier<AuthState> {
         },
       );
 
+      debugPrint('📝 Signup response: $res');
+
+      final accessToken = (res['accessToken'] ??
+          res['token'] ??
+          res['access_token']) as String?;
+      final refreshToken =
+          (res['refreshToken'] ?? res['refresh_token']) as String?;
+      final userJson = res['user'];
+      final user = userJson is Map<String, dynamic>
+          ? UserModel.fromJson(userJson)
+          : null;
+
+      client.setAuthToken(accessToken);
+      await ref.read(tokenStorageProvider).saveTokens(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+          );
+
+      _resetUserScopedProviders();
       state = state.copyWith(
         isLoading: false,
+        isAuthenticated: true,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        user: user,
+        userId: user?.id,
         message: res['message'] as String?,
       );
       return true;

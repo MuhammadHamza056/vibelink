@@ -50,7 +50,7 @@ class ProfileState {
 class ProfileNotifier extends Notifier<ProfileState> {
   @override
   ProfileState build() {
-    _load();
+    Future.microtask(() => _load());
     return const ProfileState();
   }
 

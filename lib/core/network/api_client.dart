@@ -149,7 +149,9 @@ class ApiClient {
   Map<String, dynamic> _handle(Response res) {
     final status = res.statusCode ?? 0;
     final data = res.data;
-    final map = data is Map<String, dynamic> ? data : <String, dynamic>{};
+    final map = data is Map<String, dynamic>
+        ? data
+        : (data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{});
 
     if (status >= 200 && status < 300) return map;
 
@@ -157,34 +159,95 @@ class ApiClient {
     debugPrint('❌ API ${res.requestOptions.method} '
         '${res.requestOptions.path} → $status | body: $data');
 
-    // Fall back to the raw body so the error is readable even without a
-    // console (shown in the toast). Truncated to keep it presentable.
-    final raw = data == null ? '' : data.toString();
-    final fallback = raw.isEmpty
-        ? 'Request failed ($status)'
-        : 'Request failed ($status): '
-            '${raw.length > 300 ? '${raw.substring(0, 300)}…' : raw}';
+    final extracted = _extractError(data);
+    final fallback = status > 0 ? 'Request failed ($status)' : 'Request failed';
 
-    throw ApiException(_extractError(map) ?? fallback, statusCode: status);
+    throw ApiException(extracted ?? fallback, statusCode: status);
   }
 
-  /// Digs a human-readable message out of the common error-body shapes:
-  /// {message}, {error}, {error:{message}}, or {errors:[{msg|message}]}.
-  String? _extractError(Map<String, dynamic> map) {
-    final msg = map['message'] ?? map['error'] ?? map['msg'];
-    if (msg is String && msg.isNotEmpty) return msg;
-    if (msg is Map && msg['message'] is String) return msg['message'] as String;
+  /// Digs a human-readable message out of common API error-body shapes:
+  /// - String body
+  /// - {message: "..."}, {message: ["err1", "err2"]}
+  /// - {error: "..."}, {error: {message: "..."}}
+  /// - {errors: ["...", ...]}, {errors: [{msg|message: "..."}, ...]}
+  /// - {detail: "..."}, {details: "..."}
+  String? _extractError(dynamic data) {
+    if (data == null) return null;
 
-    final errors = map['errors'];
-    if (errors is List && errors.isNotEmpty) {
-      final first = errors.first;
-      if (first is String) return first;
-      if (first is Map) {
-        final m = first['msg'] ?? first['message'];
-        if (m is String) return m;
+    if (data is String && data.trim().isNotEmpty) {
+      final trimmed = data.trim();
+      if (trimmed.startsWith('<html') || trimmed.startsWith('<!DOCTYPE')) {
+        return null;
+      }
+      return _cleanErrorMessage(trimmed);
+    }
+
+    if (data is Map) {
+      final map = data;
+
+      // 1. Try 'message'
+      final msg = map['message'];
+      final extractedMsg = _parseErrorMessage(msg);
+      if (extractedMsg != null) return extractedMsg;
+
+      // 2. Try 'error'
+      final err = map['error'];
+      final extractedErr = _parseErrorMessage(err);
+      if (extractedErr != null) return extractedErr;
+
+      // 3. Try 'errors' list
+      final errors = map['errors'];
+      if (errors is List && errors.isNotEmpty) {
+        final messages = <String>[];
+        for (final item in errors) {
+          final parsed = _parseErrorMessage(item);
+          if (parsed != null) messages.add(parsed);
+        }
+        if (messages.isNotEmpty) return messages.join('\n');
+      }
+
+      // 4. Try 'msg', 'detail', 'details'
+      for (final key in ['msg', 'detail', 'details']) {
+        final val = map[key];
+        final parsed = _parseErrorMessage(val);
+        if (parsed != null) return parsed;
       }
     }
+
     return null;
+  }
+
+  String? _parseErrorMessage(dynamic val) {
+    if (val == null) return null;
+    if (val is String && val.trim().isNotEmpty) {
+      return _cleanErrorMessage(val);
+    }
+    if (val is List && val.isNotEmpty) {
+      final list = val
+          .map((e) => _parseErrorMessage(e))
+          .where((s) => s != null && s.isNotEmpty)
+          .cast<String>()
+          .toList();
+      if (list.isNotEmpty) return list.join('\n');
+    }
+    if (val is Map) {
+      return _extractError(val);
+    }
+    return null;
+  }
+
+  String _cleanErrorMessage(String msg) {
+    var cleaned = msg.trim();
+    cleaned = cleaned.replaceFirst(
+      RegExp(
+        r'^(?:[A-Za-z0-9_]*[E|e]xception|[a-zA-Z\s]+exception|Error):\s*',
+        caseSensitive: false,
+      ),
+      '',
+    ).trim();
+
+    if (cleaned.isEmpty) return msg;
+    return cleaned[0].toUpperCase() + cleaned.substring(1);
   }
 
   String _messageFor(DioException e) {

@@ -4,6 +4,7 @@ import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../models/challenge_model.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../home/providers/home_provider.dart';
 
 enum ChallengeFilter { today, thisWeek, trending }
 
@@ -92,7 +93,7 @@ class ChallengeState {
 class ChallengeNotifier extends Notifier<ChallengeState> {
   @override
   ChallengeState build() {
-    _load();
+    Future.microtask(() => _load());
     return const ChallengeState();
   }
 
@@ -215,6 +216,7 @@ class ChallengeNotifier extends Notifier<ChallengeState> {
         completableAt: updatedCompletableAt,
       );
       await ref.read(tokenStorageProvider).saveActiveChallenges(updatedCompletableAt);
+      ref.read(homeProvider.notifier).refresh();
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(error: e.message);

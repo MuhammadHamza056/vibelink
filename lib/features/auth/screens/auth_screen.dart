@@ -54,10 +54,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           context,
           auth.message ?? 'Account created successfully',
         );
-        // Move to the login view so the new user can sign in.
-        ref.read(authFormProvider.notifier).showLogin();
-        _usernameCtrl.clear();
-        _passCtrl.clear();
+        context.go(AppConstants.routeHome);
       } else {
         ToastUtil.error(context, auth.error ?? 'Registration failed');
       }
