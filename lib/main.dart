@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'app.dart';
-import 'core/storage/token_storage.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
@@ -16,29 +14,10 @@ Future<void> main() async {
     ),
   );
 
-  final prefs = await SharedPreferences.getInstance();
-  final isFirstRun = prefs.getBool('app_has_run_before') != true;
-  final tokenStorage = TokenStorage();
-
-  if (isFirstRun) {
-    // Clear iOS Keychain entries left over from prior installations
-    await tokenStorage.clearAll();
-    await prefs.setBool('app_has_run_before', true);
-  }
-
-  final accessToken = await tokenStorage.readAccessToken();
-  final refreshToken = await tokenStorage.readRefreshToken();
-  final seenOnboarding = await tokenStorage.readOnboardingSeen();
-
   runApp(
-    ProviderScope(
-      overrides: [
-        bootstrapTokensProvider.overrideWithValue(
-          (accessToken: accessToken, refreshToken: refreshToken),
-        ),
-        bootstrapOnboardingSeenProvider.overrideWithValue(seenOnboarding),
-      ],
-      child: const VibeLinkApp(),
+    const ProviderScope(
+      child: VibeLinkApp(),
     ),
   );
 }
+

@@ -20,44 +20,63 @@ import '../constants/app_constants.dart';
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
+/// Adapts Riverpod's [AuthState] to Flutter's [Listenable] without extending
+/// legacy [ChangeNotifier], keeping Riverpod as the single source of truth.
+class AuthStateListenable extends ValueNotifier<AuthState> {
+  AuthStateListenable(Ref ref) : super(ref.read(authProvider)) {
+    ref.listen<AuthState>(authProvider, (_, next) {
+      value = next;
+    });
+  }
+
+  String? redirect(BuildContext context, GoRouterState state) {
+    final authState = value;
+
+    // Don't redirect until initial async bootstrap from TokenStorage completes
+    if (!authState.isInitialized) return null;
+
+    final loc = state.matchedLocation;
+    final token = authState.accessToken;
+    final isAuth =
+        authState.isAuthenticated && token != null && token.isNotEmpty;
+    final seenOnboarding = authState.hasSeenOnboarding;
+    final isOnSplash = loc == AppConstants.routeSplash;
+    final isOnOnboarding = loc == AppConstants.routeOnboarding;
+    final isOnAuth = loc == AppConstants.routeAuth;
+
+    // Signed in: immediately go to home if on splash, auth, or onboarding.
+    if (isAuth) {
+      if (isOnSplash || isOnAuth || isOnOnboarding) return AppConstants.routeHome;
+      return null;
+    }
+
+    // Signed out and onboarding not done yet → force onboarding.
+    if (!seenOnboarding) {
+      if (isOnSplash || !isOnOnboarding) return AppConstants.routeOnboarding;
+      return null;
+    }
+
+    // Signed out and onboarding already seen → force auth screen.
+    if (isOnSplash || !isOnAuth) return AppConstants.routeAuth;
+    return null;
+  }
+}
+
+final authStateListenableProvider = Provider<AuthStateListenable>((ref) {
+  return AuthStateListenable(ref);
+});
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  final listenable = ref.read(authStateListenableProvider);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppConstants.routeSplash,
-    redirect: (context, state) => _redirect(state, authState),
+    refreshListenable: listenable,
+    redirect: listenable.redirect,
     routes: _routes,
   );
 });
-
-
-String? _redirect(GoRouterState state, AuthState authState) {
-  final loc = state.matchedLocation;
-
-  final token = authState.accessToken;
-  final isAuth = authState.isAuthenticated && token != null && token.isNotEmpty;
-  final seenOnboarding = authState.hasSeenOnboarding;
-  final isOnSplash = loc == AppConstants.routeSplash;
-  final isOnOnboarding = loc == AppConstants.routeOnboarding;
-  final isOnAuth = loc == AppConstants.routeAuth;
-
-  // Signed in: immediately go to home if on splash, auth, or onboarding.
-  if (isAuth) {
-    if (isOnSplash || isOnAuth || isOnOnboarding) return AppConstants.routeHome;
-    return null;
-  }
-
-  // Signed out and onboarding not done yet → force onboarding.
-  if (!seenOnboarding) {
-    if (isOnSplash || !isOnOnboarding) return AppConstants.routeOnboarding;
-    return null;
-  }
-
-  // Signed out and onboarding already seen → force auth screen.
-  if (isOnSplash || !isOnAuth) return AppConstants.routeAuth;
-  return null;
-}
 
 final List<RouteBase> _routes = [
   GoRoute(

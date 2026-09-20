@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/network/api_endpoints.dart';
 import '../../../models/user_model.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../repositories/profile_repository.dart';
 
 class ProfileState {
   const ProfileState({
@@ -17,12 +17,8 @@ class ProfileState {
 
   final UserModel? user;
   final bool isLoading;
-
-  /// True while a PATCH /api/profile update is in flight.
   final bool isSaving;
   final double burnoutRiskLevel;
-
-  /// All selectable vibe tags from GET /api/profile/vibe-tags.
   final List<String> availableTags;
   final String? error;
 
@@ -54,9 +50,6 @@ class ProfileNotifier extends Notifier<ProfileState> {
     return const ProfileState();
   }
 
-  /// Fetches the signed-in user from GET /api/profile. The payload is wrapped
-  /// in a `body` object, which we unwrap into [UserModel]. The selectable vibe
-  /// tags are loaded concurrently and never block the profile itself.
   Future<void> _load() async {
     final auth = ref.read(authProvider);
     if (!auth.isAuthenticated ||
@@ -65,22 +58,15 @@ class ProfileNotifier extends Notifier<ProfileState> {
       state = state.copyWith(isLoading: false);
       return;
     }
-    final client = ref.read(apiClientProvider);
+    final repo = ref.read(profileRepositoryProvider);
 
-    // Best-effort: fetch the list of selectable vibe tags alongside the profile.
-    _fetchVibeTags(client);
+    _fetchVibeTags(repo);
 
     try {
-      final res = await client.get(ApiEndpoints.profile);
-      final body = res['body'];
-      if (body is! Map<String, dynamic>) {
-        throw ApiException('Unexpected profile response.');
-      }
-      final user = UserModel.fromJson(body);
+      final user = await repo.fetchProfile();
       state = state.copyWith(
         user: user,
         isLoading: false,
-        // Burnout risk scales with the active streak until the guard threshold.
         burnoutRiskLevel: user.isOnBurnoutGuard ? 0.85 : 0.25,
       );
     } on ApiException catch (e) {
@@ -93,37 +79,20 @@ class ProfileNotifier extends Notifier<ProfileState> {
     }
   }
 
-  /// Loads selectable vibe tags from GET /api/profile/vibe-tags. The response
-  /// wraps the list in `body.tags`. Failures are swallowed since the screen
-  /// falls back to the built-in [AppConstants.vibeTags] list.
-  Future<void> _fetchVibeTags(ApiClient client) async {
+  Future<void> _fetchVibeTags(ProfileRepository repo) async {
     try {
-      final res = await client.get(ApiEndpoints.profileVibeTags);
-      final body = res['body'];
-      final tags = body is Map<String, dynamic>
-          ? (body['tags'] as List?)?.cast<String>()
-          : null;
-      if (tags != null && tags.isNotEmpty) {
+      final tags = await repo.fetchVibeTags();
+      if (tags.isNotEmpty) {
         state = state.copyWith(availableTags: tags);
       }
-    } catch (_) {
-      // Ignore — the screen falls back to a built-in tag list.
-    }
+    } catch (_) {}
   }
 
-  /// Re-fetches the profile (e.g. pull-to-refresh).
   Future<void> refresh() {
     state = state.copyWith(isLoading: true, error: null);
     return _load();
   }
 
-  /// Persists profile changes via PATCH /api/profile. Only the fields passed in
-  /// are sent, so callers can update a single property at a time. The updated
-  /// user is read back from the response `body`, falling back to an optimistic
-  /// local merge when the server echoes nothing.
-  ///
-  /// Returns true on success; on failure the state is rolled back to [previous]
-  /// and [ProfileState.error] is populated.
   Future<bool> updateProfile({
     String? username,
     String? avatarUrl,
@@ -138,7 +107,6 @@ class ProfileNotifier extends Notifier<ProfileState> {
 
     final body = <String, dynamic>{
       if (username != null) 'username': username,
-      // A picked file replaces avatarUrl; don't send both.
       if (avatarUrl != null && avatarFilePath == null) 'avatarUrl': avatarUrl,
       if (vibeTags != null) 'vibeTags': vibeTags,
       if (safetyPulseEnabled != null) 'safetyPulseEnabled': safetyPulseEnabled,
@@ -147,9 +115,6 @@ class ProfileNotifier extends Notifier<ProfileState> {
     };
     if (body.isEmpty && avatarFilePath == null) return true;
 
-    // Optimistically reflect the change while the request is in flight. The
-    // avatar isn't reflected optimistically — we wait for the server's hosted
-    // URL in the response.
     final previous = state;
     final optimistic = current.copyWith(
       username: username,
@@ -162,18 +127,9 @@ class ProfileNotifier extends Notifier<ProfileState> {
     state = state.copyWith(user: optimistic, isSaving: true, error: null);
 
     try {
-      final client = ref.read(apiClientProvider);
-      if (avatarFilePath != null) {
-        await client.patchMultipart(
-          ApiEndpoints.profile,
-          fields: body,
-          filePath: avatarFilePath,
-        );
-      } else {
-        await client.patch(ApiEndpoints.profile, body: body);
-      }
-      // Re-fetch the authoritative profile from GET /api/profile so the UI
-      // reflects exactly what the server stored (e.g. the hosted avatar URL).
+      final repo = ref.read(profileRepositoryProvider);
+      await repo.updateProfile(body: body, avatarFilePath: avatarFilePath);
+
       await _load();
       state = state.copyWith(isSaving: false);
       return true;
@@ -189,7 +145,6 @@ class ProfileNotifier extends Notifier<ProfileState> {
     }
   }
 
-  /// Toggles a single vibe tag and persists the new set via PATCH /api/profile.
   Future<bool> toggleVibeTag(String tag) {
     final current = state.user;
     if (current == null) return Future.value(false);
@@ -198,7 +153,6 @@ class ProfileNotifier extends Notifier<ProfileState> {
     return updateProfile(vibeTags: tags);
   }
 
-  /// Replaces the full vibe-tag set and persists it via PATCH /api/profile.
   Future<bool> updateVibeTags(List<String> tags) =>
       updateProfile(vibeTags: tags);
 
@@ -210,8 +164,6 @@ class ProfileNotifier extends Notifier<ProfileState> {
 final profileProvider =
     NotifierProvider<ProfileNotifier, ProfileState>(ProfileNotifier.new);
 
-/// Transient state for the Edit Profile sheet: the picked photo and the
-/// selected vibe tags. Auto-disposes so it resets each time the sheet is
 class EditProfileForm {
   const EditProfileForm({this.pickedImagePath, this.selectedTags = const {}});
 
@@ -219,22 +171,17 @@ class EditProfileForm {
   final Set<String> selectedTags;
 }
 
-/// Outcome of an avatar pick, so the UI can decide whether to surface an error.
 enum PickPhotoResult { picked, cancelled, failed }
 
 class EditProfileFormNotifier
     extends AutoDisposeFamilyNotifier<EditProfileForm, List<String>> {
   final ImagePicker _picker = ImagePicker();
 
-  /// [initialTags] are the profile's current vibe tags; they seed the
-  /// selection without mutating the provider during widget build.
   @override
   EditProfileForm build(List<String> initialTags) {
     return EditProfileForm(selectedTags: {...initialTags});
   }
 
-  /// Picks a photo from [source] (camera/gallery) and stores its path. Returns
-  /// the outcome so the caller can show an error toast when it fails.
   Future<PickPhotoResult> pickImage(ImageSource source) async {
     try {
       final file = await _picker.pickImage(
@@ -250,7 +197,6 @@ class EditProfileFormNotifier
     }
   }
 
-  /// Sets (or clears, when [path] is null) the freshly picked photo.
   void setImage(String? path) {
     state = EditProfileForm(
       pickedImagePath: path,

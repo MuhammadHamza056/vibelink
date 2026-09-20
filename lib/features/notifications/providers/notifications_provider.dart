@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/network/api_endpoints.dart';
 import '../../../models/notification_model.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../repositories/notifications_repository.dart';
 
 class NotificationsState {
   const NotificationsState({
@@ -17,13 +17,8 @@ class NotificationsState {
 
   final List<NotificationModel> notifications;
   final int count;
-
-  /// Number of notifications still awaiting action (drives the bell badge).
   final int pendingCount;
   final bool isLoading;
-
-  /// Id of the notification whose accept/reject request is in flight (null when
-  /// none), and whether that in-flight action is an accept.
   final String? respondingId;
   final bool respondingIsAccept;
   final String? error;
@@ -56,8 +51,6 @@ class NotificationsNotifier extends Notifier<NotificationsState> {
     return const NotificationsState();
   }
 
-  /// Fetches the user's notifications from GET /api/notifications. The payload's
-  /// `body` holds `count`, `pendingCount` and the `notifications` array.
   Future<void> _load() async {
     final auth = ref.read(authProvider);
     if (!auth.isAuthenticated || auth.accessToken == null || auth.accessToken!.isEmpty) {
@@ -65,21 +58,12 @@ class NotificationsNotifier extends Notifier<NotificationsState> {
       return;
     }
     try {
-      final res =
-          await ref.read(apiClientProvider).get(ApiEndpoints.notifications);
-      final body = res['body'];
-      if (body is! Map<String, dynamic>) {
-        throw ApiException('Unexpected notifications response.');
-      }
-      final list = (body['notifications'] as List?)
-              ?.whereType<Map<String, dynamic>>()
-              .map(NotificationModel.fromJson)
-              .toList() ??
-          const <NotificationModel>[];
+      final repo = ref.read(notificationsRepositoryProvider);
+      final result = await repo.fetchNotifications();
       state = state.copyWith(
-        notifications: list,
-        count: (body['count'] ?? list.length) as int,
-        pendingCount: (body['pendingCount'] ?? 0) as int,
+        notifications: result.notifications,
+        count: result.count,
+        pendingCount: result.pendingCount,
         isLoading: false,
       );
     } on ApiException catch (e) {
@@ -92,16 +76,13 @@ class NotificationsNotifier extends Notifier<NotificationsState> {
     }
   }
 
-  /// Re-fetches notifications (e.g. pull-to-refresh).
   Future<void> refresh() {
     state = state.copyWith(isLoading: true, error: null);
     return _load();
   }
 
-  /// Accepts the connection request via POST /api/notifications/{id}/accept.
   Future<bool> accept(String id) => _respond(id, accept: true);
 
-  /// Rejects the connection request via POST /api/notifications/{id}/reject.
   Future<bool> reject(String id) => _respond(id, accept: false);
 
   Future<bool> _respond(String id, {required bool accept}) async {
@@ -111,13 +92,9 @@ class NotificationsNotifier extends Notifier<NotificationsState> {
       error: null,
     );
     try {
-      await ref.read(apiClientProvider).post(
-            accept
-                ? ApiEndpoints.notificationAccept(id)
-                : ApiEndpoints.notificationReject(id),
-          );
-      // Reflect the resolved status locally so the buttons disappear and the
-      // pending count (and bell badge) update without a full refetch.
+      final repo = ref.read(notificationsRepositoryProvider);
+      await repo.respondToNotification(id, accept: accept);
+
       final updated = [
         for (final n in state.notifications)
           n.id == id ? n.copyWith(status: accept ? 'accepted' : 'rejected') : n,

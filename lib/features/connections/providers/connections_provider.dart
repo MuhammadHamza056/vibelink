@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/network/api_endpoints.dart';
 import '../../../models/connection_model.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../repositories/connections_repository.dart';
 
 class ConnectionsState {
   const ConnectionsState({
@@ -16,8 +16,6 @@ class ConnectionsState {
   final List<ConnectionModel> connections;
   final int count;
   final bool isLoading;
-
-  /// connectionId whose leave (DELETE) request is currently in flight.
   final String? leavingId;
   final String? error;
 
@@ -45,8 +43,6 @@ class ConnectionsNotifier extends Notifier<ConnectionsState> {
     return const ConnectionsState();
   }
 
-  /// Fetches the user's connections from GET /api/match/connections. The
-  /// payload's `body` holds `count` and the `connections` array.
   Future<void> _load() async {
     final auth = ref.read(authProvider);
     if (!auth.isAuthenticated || auth.accessToken == null || auth.accessToken!.isEmpty) {
@@ -54,20 +50,11 @@ class ConnectionsNotifier extends Notifier<ConnectionsState> {
       return;
     }
     try {
-      final res =
-          await ref.read(apiClientProvider).get(ApiEndpoints.matchConnections);
-      final body = res['body'];
-      if (body is! Map<String, dynamic>) {
-        throw ApiException('Unexpected connections response.');
-      }
-      final list = (body['connections'] as List?)
-              ?.whereType<Map<String, dynamic>>()
-              .map(ConnectionModel.fromJson)
-              .toList() ??
-          const <ConnectionModel>[];
+      final repo = ref.read(connectionsRepositoryProvider);
+      final result = await repo.fetchConnections();
       state = state.copyWith(
-        connections: list,
-        count: (body['count'] ?? list.length) as int,
+        connections: result.connections,
+        count: result.count,
         isLoading: false,
       );
     } on ApiException catch (e) {
@@ -80,20 +67,16 @@ class ConnectionsNotifier extends Notifier<ConnectionsState> {
     }
   }
 
-  /// Re-fetches connections (e.g. pull-to-refresh).
   Future<void> refresh() {
     state = state.copyWith(isLoading: true, error: null);
     return _load();
   }
 
-  /// Leaves a connection via DELETE /api/match/connections/{connectionId}. On
-  /// success the connection is removed from the list. Returns true on success.
   Future<bool> leave(String connectionId) async {
     state = state.copyWith(leavingId: connectionId, error: null);
     try {
-      await ref.read(apiClientProvider).delete(
-            ApiEndpoints.matchConnectionLeave(connectionId),
-          );
+      final repo = ref.read(connectionsRepositoryProvider);
+      await repo.leaveConnection(connectionId);
       final remaining = state.connections
           .where((c) => c.connectionId != connectionId)
           .toList();

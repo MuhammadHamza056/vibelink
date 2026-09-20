@@ -171,34 +171,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     style: AppTextStyles.bodyMedium,
                   ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
                   const SizedBox(height: 36),
-                  // Social buttons
-                  // _SocialAuthButton(
-                  //   label: 'Continue with Google',
-                  //   emoji: 'G',
-                  //   onTap: _onGoogle,
-                  //   isLoading: auth.isLoading,
-                  // ).animate(delay: 250.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
-                  // const SizedBox(height: 12),
-                  // _SocialAuthButton(
-                  //   label: 'Continue with Apple',
-                  //   emoji: '',
-                  //   icon: Icons.apple_rounded,
-                  //   onTap: _onApple,
-                  //   isLoading: auth.isLoading,
-                  // ).animate(delay: 300.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
-                  // const SizedBox(height: 24),
-                  // // Divider
-                  // Row(
-                  //   children: [
-                  //     Expanded(child: Divider(color: AppColors.cardBorder)),
-                  //     Padding(
-                  //       padding: const EdgeInsets.symmetric(horizontal: 16),
-                  //       child: Text('or', style: AppTextStyles.bodySmall),
-                  //     ),
-                  //     Expanded(child: Divider(color: AppColors.cardBorder)),
-                  //   ],
-                  // ).animate(delay: 350.ms).fadeIn(),
-                  const SizedBox(height: 24),
                   // Email field
                   _GlassTextField(
                     controller: _emailCtrl,

@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../core/constants/app_constants.dart';
-import '../providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -25,20 +22,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat(reverse: true);
-
-    Future.delayed(const Duration(milliseconds: 2800), _navigate);
-  }
-
-  void _navigate() {
-    if (!mounted) return;
-    final auth = ref.read(authProvider);
-    if (auth.isAuthenticated) {
-      context.go(AppConstants.routeHome);
-    } else if (auth.hasSeenOnboarding) {
-      context.go(AppConstants.routeAuth);
-    } else {
-      context.go(AppConstants.routeOnboarding);
-    }
   }
 
   @override

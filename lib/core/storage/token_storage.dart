@@ -84,14 +84,3 @@ class TokenStorage {
 
 final tokenStorageProvider = Provider<TokenStorage>((ref) => TokenStorage());
 
-/// Tokens read from secure storage at app start. Overridden in `main()` once
-/// the persisted values have been loaded; defaults to empty so a cold start
-/// without an override behaves as "logged out".
-final bootstrapTokensProvider =
-    Provider<({String? accessToken, String? refreshToken})>(
-  (ref) => (accessToken: null, refreshToken: null),
-);
-
-/// Whether onboarding has been completed, read from secure storage at app
-/// start. Overridden in `main()`; defaults to `false` (show onboarding).
-final bootstrapOnboardingSeenProvider = Provider<bool>((ref) => false);

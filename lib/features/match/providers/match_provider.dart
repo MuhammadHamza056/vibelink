@@ -1,13 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/network/api_endpoints.dart';
 import '../../../core/services/location_service.dart';
+import '../repositories/match_repository.dart';
 
 enum MatchStatus { searching, found, connected, skipped }
 
-/// A single nearby match returned by GET /api/match/nearby. The API nests the
-/// person under `user` and exposes the compatibility data (`vibeScore`,
-/// `sharedTags`) at the top level of each match entry.
 class MatchCandidate {
   const MatchCandidate({
     required this.id,
@@ -66,20 +63,12 @@ class MatchState {
   });
 
   final MatchStatus status;
-
-  /// All matches from the last GET /api/match/nearby call. The user flips
-  /// through them one at a time via [MatchNotifier.skipMatch].
   final List<MatchCandidate> candidates;
   final int currentIndex;
-
-  /// True while the GET /api/match/nearby search is in flight.
   final bool isLoading;
-
-  /// True while a POST /api/match/connect request is in flight.
   final bool isConnecting;
   final String? error;
 
-  /// The match currently shown, or null when the list is empty/exhausted.
   MatchCandidate? get candidate =>
       currentIndex >= 0 && currentIndex < candidates.length
           ? candidates[currentIndex]
@@ -108,12 +97,9 @@ class MatchNotifier extends Notifier<MatchState> {
   @override
   MatchState build() => const MatchState();
 
-  // Search parameters sent to GET /api/match/nearby.
   static const int _radius = 5000;
   static const int _limit = 50;
 
-  /// Fetches nearby matches and shows the first one. The backend matches
-  /// against the user's stored location, so we only pass `radius` and `limit`.
   Future<void> startSearch() async {
     state = state.copyWith(
       status: MatchStatus.searching,
@@ -131,27 +117,13 @@ class MatchNotifier extends Notifier<MatchState> {
         return;
       }
 
-      // Sync device location to the backend first
-      try {
-        await ref.read(apiClientProvider).put(
-          ApiEndpoints.profileLocation,
-          body: {'lat': pos.latitude, 'lng': pos.longitude},
-        );
-      } catch (_) {
-        // Continue search if location update fails non-fatally
-      }
+      final repo = ref.read(matchRepositoryProvider);
+      await repo.updateLocation(lat: pos.latitude, lng: pos.longitude);
 
-      final res = await ref.read(apiClientProvider).get(
-        ApiEndpoints.matchNearby,
-        query: {'radius': _radius, 'limit': _limit},
+      final candidates = await repo.fetchNearbyMatches(
+        radius: _radius,
+        limit: _limit,
       );
-      final body = res['body'];
-      final rawMatches =
-          body is Map<String, dynamic> ? body['matches'] as List? : null;
-      final candidates = (rawMatches ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(MatchCandidate.fromJson)
-          .toList();
 
       if (candidates.isEmpty) {
         state = state.copyWith(
@@ -185,19 +157,14 @@ class MatchNotifier extends Notifier<MatchState> {
     }
   }
 
-  /// Connects with the current match via POST /api/match/connect, sending the
-  /// matched user's id. Only flips to the connected state on success; returns
-  /// true on success and false (with [MatchState.error] set) on failure.
   Future<bool> acceptMatch() async {
     final candidate = state.candidate;
     if (candidate == null) return false;
 
     state = state.copyWith(isConnecting: true, error: null);
     try {
-      await ref.read(apiClientProvider).post(
-        ApiEndpoints.matchConnect,
-        body: {'userId': candidate.id},
-      );
+      final repo = ref.read(matchRepositoryProvider);
+      await repo.connectMatch(candidate.id);
       state = state.copyWith(
         status: MatchStatus.connected,
         isConnecting: false,
@@ -215,8 +182,6 @@ class MatchNotifier extends Notifier<MatchState> {
     }
   }
 
-  /// Moves to the next fetched match. When the list is exhausted it triggers a
-  /// fresh search.
   void skipMatch() {
     final next = state.currentIndex + 1;
     if (next < state.candidates.length) {

@@ -1,9 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../models/user_model.dart';
+import '../repositories/auth_repository.dart';
 import '../../challenges/providers/challenge_provider.dart';
 import '../../connections/providers/connections_provider.dart';
 import '../../home/providers/home_provider.dart';
@@ -16,6 +17,7 @@ class AuthState {
   const AuthState({
     this.isAuthenticated = false,
     this.isLoading = false,
+    this.isInitialized = false,
     this.hasSeenOnboarding = false,
     this.userId,
     this.user,
@@ -27,6 +29,7 @@ class AuthState {
 
   final bool isAuthenticated;
   final bool isLoading;
+  final bool isInitialized;
   final bool hasSeenOnboarding;
   final String? userId;
   final UserModel? user;
@@ -38,6 +41,7 @@ class AuthState {
   AuthState copyWith({
     bool? isAuthenticated,
     bool? isLoading,
+    bool? isInitialized,
     bool? hasSeenOnboarding,
     String? userId,
     UserModel? user,
@@ -49,6 +53,7 @@ class AuthState {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       isLoading: isLoading ?? this.isLoading,
+      isInitialized: isInitialized ?? this.isInitialized,
       hasSeenOnboarding: hasSeenOnboarding ?? this.hasSeenOnboarding,
       userId: userId ?? this.userId,
       user: user ?? this.user,
@@ -63,19 +68,51 @@ class AuthState {
 class AuthNotifier extends Notifier<AuthState> {
   @override
   AuthState build() {
-    final tokens = ref.read(bootstrapTokensProvider);
-    final seenOnboarding = ref.read(bootstrapOnboardingSeenProvider);
-    final accessToken = tokens.accessToken;
-    if (accessToken != null && accessToken.isNotEmpty) {
-      ref.read(apiClientProvider).setAuthToken(accessToken);
-      return AuthState(
-        isAuthenticated: true,
-        hasSeenOnboarding: true,
-        accessToken: accessToken,
-        refreshToken: tokens.refreshToken,
+    _bootstrap();
+    return const AuthState(isLoading: true, isInitialized: false);
+  }
+
+  Future<void> _bootstrap() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isFirstRun = prefs.getBool('app_has_run_before') != true;
+      final tokenStorage = ref.read(tokenStorageProvider);
+
+      if (isFirstRun) {
+        await tokenStorage.clearAll();
+        await prefs.setBool('app_has_run_before', true);
+      }
+
+      final accessToken = await tokenStorage.readAccessToken();
+      final refreshToken = await tokenStorage.readRefreshToken();
+      final seenOnboarding = await tokenStorage.readOnboardingSeen();
+
+      if (accessToken != null && accessToken.isNotEmpty) {
+        ref.read(apiClientProvider).setAuthToken(accessToken);
+        state = AuthState(
+          isInitialized: true,
+          isAuthenticated: true,
+          hasSeenOnboarding: true,
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+          isLoading: false,
+        );
+      } else {
+        state = AuthState(
+          isInitialized: true,
+          isAuthenticated: false,
+          hasSeenOnboarding: seenOnboarding,
+          isLoading: false,
+        );
+      }
+    } catch (_) {
+      state = const AuthState(
+        isInitialized: true,
+        isAuthenticated: false,
+        hasSeenOnboarding: false,
+        isLoading: false,
       );
     }
-    return AuthState(hasSeenOnboarding: seenOnboarding);
   }
 
   Future<bool> register({
@@ -85,43 +122,30 @@ class AuthNotifier extends Notifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null, message: null);
     try {
-      final client = ref.read(apiClientProvider);
-      final res = await client.post(
-        ApiEndpoints.register,
-        body: {
-          'email': email,
-          'username': username,
-          'password': password,
-        },
+      final repo = ref.read(authRepositoryProvider);
+      final result = await repo.register(
+        email: email,
+        username: username,
+        password: password,
       );
 
-      debugPrint('📝 Signup response: $res');
+      debugPrint('📝 Signup response: ${result.user?.username}');
 
-      final accessToken = (res['accessToken'] ??
-          res['token'] ??
-          res['access_token']) as String?;
-      final refreshToken =
-          (res['refreshToken'] ?? res['refresh_token']) as String?;
-      final userJson = res['user'];
-      final user = userJson is Map<String, dynamic>
-          ? UserModel.fromJson(userJson)
-          : null;
-
-      client.setAuthToken(accessToken);
+      ref.read(apiClientProvider).setAuthToken(result.accessToken);
       await ref.read(tokenStorageProvider).saveTokens(
-            accessToken: accessToken,
-            refreshToken: refreshToken,
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
           );
 
       _resetUserScopedProviders();
       state = state.copyWith(
         isLoading: false,
         isAuthenticated: true,
-        accessToken: accessToken,
-        refreshToken: refreshToken,
-        user: user,
-        userId: user?.id,
-        message: res['message'] as String?,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        user: result.user,
+        userId: result.user?.id,
+        message: result.message,
       );
       return true;
     } on ApiException catch (e) {
@@ -136,42 +160,29 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<bool> signInWithEmail(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null, message: null);
     try {
-      final client = ref.read(apiClientProvider);
-      final res = await client.post(
-        ApiEndpoints.login,
-        body: {
-          'email': email,
-          'password': password,
-        },
+      final repo = ref.read(authRepositoryProvider);
+      final result = await repo.signInWithEmail(
+        email: email,
+        password: password,
       );
 
-      debugPrint('🔐 Login response: $res');
+      debugPrint('🔐 Login response: ${result.user?.username}');
 
-      final accessToken = (res['accessToken'] ??
-          res['token'] ??
-          res['access_token']) as String?;
-      final refreshToken =
-          (res['refreshToken'] ?? res['refresh_token']) as String?;
-      final userJson = res['user'];
-      final user = userJson is Map<String, dynamic>
-          ? UserModel.fromJson(userJson)
-          : null;
-
-      client.setAuthToken(accessToken);
+      ref.read(apiClientProvider).setAuthToken(result.accessToken);
       await ref.read(tokenStorageProvider).saveTokens(
-            accessToken: accessToken,
-            refreshToken: refreshToken,
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
           );
 
       _resetUserScopedProviders();
       state = state.copyWith(
         isLoading: false,
         isAuthenticated: true,
-        accessToken: accessToken,
-        refreshToken: refreshToken,
-        user: user,
-        userId: user?.id,
-        message: res['message'] as String?,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        user: result.user,
+        userId: result.user?.id,
+        message: result.message,
       );
       return true;
     } on ApiException catch (e) {
@@ -183,33 +194,13 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  Future<void> signInWithGoogle() async {
-    state = state.copyWith(isLoading: true, error: null);
-    await Future.delayed(const Duration(seconds: 1));
-    state = state.copyWith(
-      isLoading: false,
-      isAuthenticated: true,
-      userId: 'user_001',
-    );
-  }
-
-  Future<void> signInWithApple() async {
-    state = state.copyWith(isLoading: true, error: null);
-    await Future.delayed(const Duration(seconds: 1));
-    state = state.copyWith(
-      isLoading: false,
-      isAuthenticated: true,
-      userId: 'user_001',
-    );
-  }
-
   Future<void> completeOnboarding() async {
     state = state.copyWith(hasSeenOnboarding: true);
     await ref.read(tokenStorageProvider).setOnboardingSeen();
   }
 
   Future<void> signOut() async {
-    state = const AuthState(hasSeenOnboarding: true);
+    state = const AuthState(isInitialized: true, hasSeenOnboarding: true);
     await ref.read(tokenStorageProvider).clear();
     ref.read(apiClientProvider).setAuthToken(null);
     _resetUserScopedProviders();
@@ -249,7 +240,6 @@ class AuthFormNotifier extends AutoDisposeNotifier<AuthFormState> {
 
   void toggleMode() => state = state.copyWith(isSignUp: !state.isSignUp);
 
-  /// Switch to the login view (used after a successful registration).
   void showLogin() => state = state.copyWith(isSignUp: false);
 
   void toggleObscure() =>

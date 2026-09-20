@@ -56,6 +56,7 @@ class ApiEndpoints {
 
   // ---- Memories ----
   static const String memories = '/api/memories';
+  static String memoryById(String id) => '/api/memories/$id';
 
   // ---- Challenges ----
   static const String challenges = '/api/challenges';
