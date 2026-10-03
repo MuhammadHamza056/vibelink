@@ -11,6 +11,8 @@ import '../../../shared/widgets/cached_avatar.dart';
 import '../../../shared/widgets/gradient_button.dart';
 import '../../../shared/widgets/streak_indicator.dart';
 import '../../../features/auth/providers/auth_provider.dart';
+import 'package:in_app_update/in_app_update.dart';
+import '../../../core/services/app_update_service.dart';
 import '../providers/profile_provider.dart';
 import '../widgets/burnout_guard.dart';
 import '../widgets/edit_profile_sheet.dart';
@@ -312,6 +314,54 @@ class ProfileScreen extends ConsumerWidget {
                       .animate(delay: 570.ms)
                       .fadeIn(duration: 500.ms),
                   const SizedBox(height: 28),
+
+                  // Check for updates
+                  OutlineButton(
+                    label: 'Check for Updates',
+                    icon: Icons.system_update_alt_rounded,
+                    onTap: () async {
+                      final updateService = ref.read(appUpdateServiceProvider);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Checking for updates...'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                      final info = await updateService.checkForUpdate();
+                      if (!context.mounted) return;
+
+                      if (info == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not check for updates (requires Google Play on Android device).'),
+                          ),
+                        );
+                      } else if (info.updateAvailability == UpdateAvailability.updateAvailable) {
+                        await updateService.performAutoUpdateCheck(
+                          onFlexibleUpdateDownloaded: () {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('Update ready! Restart to apply.'),
+                                action: SnackBarAction(
+                                  label: 'RESTART',
+                                  onPressed: () => updateService.completeFlexibleUpdate(),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Your app is already up to date! 🎉'),
+                          ),
+                        );
+                      }
+                    },
+                    color: AppColors.primaryLight,
+                  ).animate(delay: 580.ms).fadeIn(duration: 400.ms),
+                  const SizedBox(height: 16),
 
                   // Sign out
                   OutlineButton(

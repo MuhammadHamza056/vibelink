@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../core/services/app_update_service.dart';
 import '../../shared/widgets/bottom_nav_bar.dart';
 import '../../shared/widgets/gradient_button.dart';
 
-class ShellScreen extends StatelessWidget {
+class ShellScreen extends ConsumerStatefulWidget {
   const ShellScreen({super.key, required this.child});
 
   final Widget child;
 
+  @override
+  ConsumerState<ShellScreen> createState() => _ShellScreenState();
+}
+
+class _ShellScreenState extends ConsumerState<ShellScreen> {
   static const _routes = [
     AppConstants.routeHome,
     AppConstants.routeChallenges,
@@ -19,6 +26,50 @@ class ShellScreen extends StatelessWidget {
     AppConstants.routeMemories,
     AppConstants.routeProfile,
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForUpdates();
+    });
+  }
+
+  void _checkForUpdates() {
+    ref.read(appUpdateServiceProvider).performAutoUpdateCheck(
+      preferImmediate: false,
+      onFlexibleUpdateDownloaded: () {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.cardBg,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            duration: const Duration(days: 1), // Stay open until user taps restart
+            content: Row(
+              children: [
+                const Icon(Icons.system_update_rounded, color: AppColors.primaryLight),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'An update has been downloaded!',
+                    style: AppTextStyles.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+            action: SnackBarAction(
+              label: 'RESTART',
+              textColor: AppColors.primaryLight,
+              onPressed: () {
+                ref.read(appUpdateServiceProvider).completeFlexibleUpdate();
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
@@ -80,7 +131,7 @@ class ShellScreen extends StatelessWidget {
       },
       child: Scaffold(
         extendBody: true,
-        body: child,
+        body: widget.child,
         bottomNavigationBar: VibeLinkBottomNav(
           currentIndex: currentIndex,
           onTap: (i) => context.go(_routes[i]),
